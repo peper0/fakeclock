@@ -1,46 +1,32 @@
-#include <gtest/gtest.h>
-
+#include "test_helpers.h"
 #include <chrono>
 #include <ctime>
+#include <fakeclock/fakeclock.h>
+#include <gtest/gtest.h>
+#include <sys/time.h>
+#include <sys/timerfd.h>
 #include <thread>
-
-#include "fakeclock.h"
 using namespace std::chrono_literals;
 
-void run_in_background(std::function<void()> f)
-{
-    // Create a new thread and run the function
-    std::thread t(f);
-    t.detach();
-}
+static constexpr auto LONG_DURATION = 3s;
 
-bool wait_for(std::function<bool()> condition, int retries = 10000)
+TEST(FakeClockTest, select)
 {
-    while (!condition() && retries > 0)
-    {
-        std::this_thread::yield();
-        retries--;
-    }
-    return condition();
-}
-
-TEST(FakeClockTest, usleep)
-{
-    ClockController clock; // Take control of time
-    static constexpr int SLEEP_DURATION_US = 1;
-    std::atomic<bool> sleep_finished = false;
-    run_in_background([&sleep_finished] {
-        usleep(SLEEP_DURATION_US);
-        sleep_finished = true;
+    MasterOfTime clock; // Take control of time
+    std::atomic<bool> operation_finished = false;
+    std::atomic<int> select_result = -1;
+    assert_sleeps_for(clock, LONG_DURATION, [&] {
+        struct timeval tv = to_timeval(LONG_DURATION);
+        fd_set readfds;
+        FD_ZERO(&readfds);
+        int fds[2];
+        pipe(fds);
+        FD_SET(fds[0], &readfds);
+        // select_result = select(1, &readfds, nullptr, nullptr, &tv);
+        select_result = select(fds[0] + 1, &readfds, nullptr, nullptr, &tv);
+        close(fds[0]);
+        close(fds[1]);
+        operation_finished = true;
     });
-    ASSERT_FALSE(wait_for([&] -> bool { return sleep_finished; }));
-
-    clock.advance(std::chrono::microseconds(SLEEP_DURATION_US));
-    ASSERT_TRUE(wait_for([&] -> bool { return sleep_finished; }));
-}
-
-int main(int argc, char **argv)
-{
-    ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
+    ASSERT_EQ(select_result, 0);
 }

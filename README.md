@@ -1,57 +1,35 @@
-FakeClock is a simple C++ library for simulating and manipulating time in your unit tests. It intercepts some time-related standard library functions and redirects them to a fake clock, which is fully controlled by the programmer and detached from real time. This allows you to test time-related code in a fast and deterministic manner.
+FakeClock is a simple C++ library designed for simulating and manipulating time in your unit tests. It is ideal for code that does not support the injection of a time source, such as external libraries or legacy code.
 
 ## Features
 
-- Simulate time progression
-- Control time speed (faster, slower, or paused)
-- Set specific dates and times
-- Easy integration with existing code
+- Decouples your tests from real-time flow
+- Simulates time progression
+- Completely non-intrusive
+- Supports time-related functions, including:
+    - Sleep functions (`usleep`, `nanosleep`, `std::this_thread::sleep_for`, etc.)
+    - Time getters (`gettimeofday`, `clock_gettime`, `std::chrono::system_clock::now`, etc.)
+    - Timeouts in blocking functions (`select`, `poll`, `epoll_wait`)
 
-## Installation
+## Why Use FakeClock?
 
-To install FakeClock, clone the repository and include the header files in your project:
-
-```sh
-git clone https://github.com/yourusername/fakeclock.git
-```
+- To make tests faster
+- To make tests deterministic
 
 ## Usage
 
 Here is a basic example of how to use FakeClock in unit tests:
 
-Ble
-
 ```cpp
-#include "fakeclock.h"
-#include <iostream>
-#include <ctime>
-#include <cassert>
-#include <chrono>
+{
+        // Create a MasterOfTime instance, which takes control over time
+        MasterOfTime clock;
 
-void test_time_travel() {
-    // Create a FakeClock instance, it takes control over
-    FakeClock clock;
+        auto start = std::chrono::system_clock::now();
+        clock.advance(10s);
+        auto end = std::chrono::system_clock::now();
 
-    // Advance time by 1 hour
-    clock.advance(3600); // 3600 seconds = 1 hour
-
-    // Get the current time using standard library function
-    std::time_t now = std::time(nullptr);
-    std::tm* now_tm = std::localtime(&now);
-    char buffer[80];
-    std::strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", now_tm);
-
-    // Check the current time
-    assert(std::string(buffer) == "2023-01-01 13:00:00");
-
-    // Restore original time functions
-    clock.restore();
-}
-
-int main() {
-    test_time_travel();
-    std::cout << "Test passed!" << std::endl;
-    return 0;
+        auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
+        assert(duration.count() == 10); // It's exactly 10 seconds
 }
 ```
 
