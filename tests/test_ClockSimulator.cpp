@@ -38,7 +38,8 @@ TEST(ClockSimulatorTest, timerfd)
     std::atomic<bool> sleep_finished = false;
     assert_sleeps_for(clock, LONG_DURATION, [&sleep_finished, fd] {
         uint64_t buf;
-        read(fd, &buf, sizeof(buf));
+        assert(read(fd, &buf, sizeof(buf)) == 0);
+        (void)buf;
         sleep_finished = true;
     });
 }

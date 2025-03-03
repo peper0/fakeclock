@@ -22,9 +22,9 @@ TEST(TimerFdTest, check_eventfd_closing_detector)
     ASSERT_NE(fd2, -1);
     EXPECT_EQ(syscall(SYS_kcmp, getpid(), getpid(), KCMP_FILE, fd, fd2), 0);
     EXPECT_NE(syscall(SYS_kcmp, getpid(), getpid(), KCMP_FILE, fd, fd3), 0);
-    close(fd);
+    assert(close(fd) == 0);
     EXPECT_NE(syscall(SYS_kcmp, getpid(), getpid(), KCMP_FILE, fd, fd2), 0);
-    close(fd2);
+    assert(close(fd2) == 0);
 }
 TEST(TimerFdTest, timerfd_create_and_settime)
 {
@@ -41,11 +41,11 @@ TEST(TimerFdTest, timerfd_create_and_settime)
     int res = timerfd_settime(timer_fd, 0, &new_value, nullptr);
     ASSERT_EQ(res, 0);
 
-    uint64_t expirations;
-    assert_sleeps_for(clock, LONG_DURATION, [&] { read(timer_fd, &expirations, sizeof(expirations)); });
+    uint64_t expirations = 0;
+    assert_sleeps_for(clock, LONG_DURATION, [&] { assert(read(timer_fd, &expirations, sizeof(expirations)) == 0); });
 
     EXPECT_EQ(expirations, 1);
-    close(timer_fd);
+    assert(close(timer_fd) == 0);
 }
 
 TEST(TimerFdTest, timerfd_create_and_settime_abstime)
@@ -55,9 +55,9 @@ TEST(TimerFdTest, timerfd_create_and_settime_abstime)
     int timer_fd = timerfd_create(CLOCK_MONOTONIC, 0);
     ASSERT_NE(timer_fd, -1);
 
-    struct timespec now;
-    clock_gettime(CLOCK_MONOTONIC, &now);
-    struct itimerspec new_value;
+    struct timespec now = {};
+    assert(clock_gettime(CLOCK_MONOTONIC, &now) == 0);
+    struct itimerspec new_value = {};
     new_value.it_value = to_timespec(to_duration(now) + LONG_DURATION);
     new_value.it_interval.tv_sec = 0;
     new_value.it_interval.tv_nsec = 0;
@@ -65,12 +65,12 @@ TEST(TimerFdTest, timerfd_create_and_settime_abstime)
     int res = timerfd_settime(timer_fd, TFD_TIMER_ABSTIME, &new_value, nullptr);
     ASSERT_EQ(res, 0);
 
-    uint64_t expirations;
-    assert_sleeps_for(clock, LONG_DURATION, [&] { read(timer_fd, &expirations, sizeof(expirations)); });
+    uint64_t expirations = 0;
+    assert_sleeps_for(clock, LONG_DURATION, [&] { assert(read(timer_fd, &expirations, sizeof(expirations)) == 0); });
 
     EXPECT_EQ(expirations, 1);
 
-    close(timer_fd);
+    assert(close(timer_fd) == 0);
 }
 
 TEST(TimerFdTest, timerfd_create_and_settime_abstime_repeated)
@@ -90,14 +90,14 @@ TEST(TimerFdTest, timerfd_create_and_settime_abstime_repeated)
     int res = timerfd_settime(timer_fd, TFD_TIMER_ABSTIME, &new_value, nullptr);
     ASSERT_EQ(res, 0);
 
-    uint64_t expirations;
-    assert_sleeps_for(clock, LONG_DURATION, [&] { read(timer_fd, &expirations, sizeof(expirations)); });
+    uint64_t expirations = 0;
+    assert_sleeps_for(clock, LONG_DURATION, [&] { assert(read(timer_fd, &expirations, sizeof(expirations)) == 0); });
     EXPECT_EQ(expirations, 1);
 
-    assert_sleeps_for(clock, 1s, [&] { read(timer_fd, &expirations, sizeof(expirations)); });
+    assert_sleeps_for(clock, 1s, [&] { assert(read(timer_fd, &expirations, sizeof(expirations)) == 0); });
     EXPECT_EQ(expirations, 1);
 
-    close(timer_fd);
+    assert(close(timer_fd) == 0);
 }
 
 TEST(TimerFdTest, timerfd_gettime)
@@ -107,7 +107,7 @@ TEST(TimerFdTest, timerfd_gettime)
     int timer_fd = timerfd_create(CLOCK_MONOTONIC, 0);
     ASSERT_NE(timer_fd, -1);
 
-    struct itimerspec new_value;
+    struct itimerspec new_value = {};
     new_value.it_value = to_timespec(LONG_DURATION);
     new_value.it_interval.tv_sec = 0;
     new_value.it_interval.tv_nsec = 0;
@@ -115,7 +115,7 @@ TEST(TimerFdTest, timerfd_gettime)
     int res = timerfd_settime(timer_fd, 0, &new_value, nullptr);
     ASSERT_EQ(res, 0);
 
-    struct itimerspec curr_value;
+    struct itimerspec curr_value = {};
     res = timerfd_gettime(timer_fd, &curr_value);
     ASSERT_EQ(res, 0);
 
@@ -123,7 +123,7 @@ TEST(TimerFdTest, timerfd_gettime)
         std::chrono::seconds(curr_value.it_value.tv_sec) + std::chrono::nanoseconds(curr_value.it_value.tv_nsec);
     ASSERT_EQ(remaining, LONG_DURATION);
 
-    close(timer_fd);
+    assert(close(timer_fd) == 0);
 }
 
 TEST(TimerFdTest, timerfd_repeated_multiple_reads)
@@ -144,14 +144,14 @@ TEST(TimerFdTest, timerfd_repeated_multiple_reads)
 
     // First expiration
     assert_sleeps_for(clock, 500ms, [&] {
-        read(timer_fd, &expirations, sizeof(expirations));
+        assert(read(timer_fd, &expirations, sizeof(expirations)) == 0);
         EXPECT_EQ(expirations, 1ul);
     });
 
     // Second expiration
     expirations = 0;
     assert_sleeps_for(clock, 500ms, [&] {
-        read(timer_fd, &expirations, sizeof(expirations));
+        assert(read(timer_fd, &expirations, sizeof(expirations)) == 0);
         EXPECT_EQ(expirations, 1ul);
     });
 
@@ -184,7 +184,7 @@ TEST(TimerFdTest, timerfd_disarm)
     EXPECT_EQ(curr_value.it_value.tv_sec, 0);
     EXPECT_EQ(curr_value.it_value.tv_nsec, 0);
 
-    close(timer_fd);
+    assert(close(timer_fd) == 0);
 }
 
 // 3. Retrieving the old value via timerfd_settime.
@@ -212,7 +212,7 @@ TEST(TimerFdTest, timerfd_settime_old_value)
 
     auto remaining_old = to_duration(old_value.it_value);
     EXPECT_EQ(remaining_old, 2s);
-    close(timer_fd);
+    assert(close(timer_fd) == 0);
 }
 
 // 4. Accumulated expirations: ensuring that multiple expirations are counted.
@@ -232,11 +232,11 @@ TEST(TimerFdTest, timerfd_repeated_expirations_accumulate)
 
     uint64_t expirations = 0;
     // Sleep for 3 seconds (skipping over some expirations), then read.
-    assert_sleeps_for(clock, 3s, [&] { read(timer_fd, &expirations, sizeof(expirations)); });
+    assert_sleeps_for(clock, 3s, [&] { assert(read(timer_fd, &expirations, sizeof(expirations)) == 0); });
     // Expect at least 3 expirations to have accumulated.
     EXPECT_GE(expirations, 3);
 
-    close(timer_fd);
+    assert(close(timer_fd) == 0);
 }
 
 // 5. Invalid nanosecond value: timerfd_settime should fail when tv_nsec is out of range.
@@ -257,7 +257,7 @@ TEST(TimerFdTest, timerfd_settime_invalid_nsec)
     EXPECT_EQ(res, -1);
     EXPECT_EQ(errno, EINVAL);
 
-    close(timer_fd);
+    assert(close(timer_fd) == 0);
 }
 
 // 6. Checking interval via timerfd_gettime for a periodic timer.
@@ -285,5 +285,5 @@ TEST(TimerFdTest, timerfd_gettime_interval)
     auto remaining = to_duration(curr_value.it_value);
     EXPECT_EQ(remaining, 2s);
 
-    close(timer_fd);
+    assert(close(timer_fd) == 0);
 }

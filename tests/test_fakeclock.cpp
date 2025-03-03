@@ -19,13 +19,15 @@ TEST(FakeClockTest, select)
         struct timeval tv = to_timeval(LONG_DURATION);
         fd_set readfds;
         FD_ZERO(&readfds);
-        int fds[2];
-        pipe(fds);
+        int fds[2] = {0, 0};
+        assert(pipe(fds) == 0);
         FD_SET(fds[0], &readfds);
         // select_result = select(1, &readfds, nullptr, nullptr, &tv);
         select_result = select(fds[0] + 1, &readfds, nullptr, nullptr, &tv);
-        close(fds[0]);
-        close(fds[1]);
+
+        assert(close(fds[0]) == 0);
+        assert(close(fds[1]) == 0);
+
         operation_finished = true;
     });
     ASSERT_EQ(select_result, 0);

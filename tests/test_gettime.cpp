@@ -14,10 +14,10 @@ TEST(FakeClockGetTest, gettimeofday)
 {
     MasterOfTime clock; // Take control of time
     struct timeval tv;
-    gettimeofday(&tv, nullptr);
+    assert(gettimeofday(&tv, nullptr) == 0);
     auto start = std::chrono::seconds(tv.tv_sec) + std::chrono::microseconds(tv.tv_usec);
     clock.advance(LONG_DURATION);
-    gettimeofday(&tv, nullptr);
+    assert(gettimeofday(&tv, nullptr) == 0);
     auto end = std::chrono::seconds(tv.tv_sec) + std::chrono::microseconds(tv.tv_usec);
     auto duration = end - start;
     ASSERT_EQ(duration, LONG_DURATION);
@@ -27,10 +27,10 @@ TEST(FakeClockGetTest, clock_gettime)
 {
     MasterOfTime clock; // Take control of time
     struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);
+    assert(clock_gettime(CLOCK_REALTIME, &ts) == 0);
     auto start = std::chrono::seconds(ts.tv_sec) + std::chrono::nanoseconds(ts.tv_nsec);
     clock.advance(LONG_DURATION);
-    clock_gettime(CLOCK_REALTIME, &ts);
+    assert(clock_gettime(CLOCK_REALTIME, &ts) == 0);
     auto end = std::chrono::seconds(ts.tv_sec) + std::chrono::nanoseconds(ts.tv_nsec);
     auto duration = end - start;
     ASSERT_EQ(duration, LONG_DURATION);
@@ -40,10 +40,10 @@ TEST(FakeClockGetTest, clock_gettime_monotonic)
 {
     MasterOfTime clock; // Take control of time
     struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
+    assert(clock_gettime(CLOCK_MONOTONIC, &ts) == 0);
     auto start = std::chrono::seconds(ts.tv_sec) + std::chrono::nanoseconds(ts.tv_nsec);
     clock.advance(LONG_DURATION);
-    clock_gettime(CLOCK_MONOTONIC, &ts);
+    assert(clock_gettime(CLOCK_MONOTONIC, &ts) == 0);
     auto end = std::chrono::seconds(ts.tv_sec) + std::chrono::nanoseconds(ts.tv_nsec);
     auto duration = end - start;
     ASSERT_EQ(duration, LONG_DURATION);
@@ -53,10 +53,10 @@ TEST(FakeClockGetTest, clock_gettime_monotonic_raw)
 {
     MasterOfTime clock; // Take control of time
     struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
+    assert(clock_gettime(CLOCK_MONOTONIC_RAW, &ts) == 0);
     auto start = std::chrono::seconds(ts.tv_sec) + std::chrono::nanoseconds(ts.tv_nsec);
     clock.advance(LONG_DURATION);
-    clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
+    assert(clock_gettime(CLOCK_MONOTONIC_RAW, &ts) == 0);
     auto end = std::chrono::seconds(ts.tv_sec) + std::chrono::nanoseconds(ts.tv_nsec);
     auto duration = end - start;
     ASSERT_EQ(duration, LONG_DURATION);
