@@ -207,7 +207,8 @@ extern "C"
                 if (FD_ISSET(fd, &fake_readfds))
                 {
                     uint64_t buf;
-                    read(fd, &buf, sizeof(buf));
+                    auto _ = read(fd, &buf, sizeof(buf));
+                    (void)_;
                     result--;
                 }
                 FD_CLR(fd, &fake_readfds);
