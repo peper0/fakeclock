@@ -24,6 +24,8 @@ class TimerFd
     {
         client_fd = eventfd(0, 0);
         my_fd = dup(client_fd);
+        interval = {};
+        next_expiration_time = {};
     }
 
     ~TimerFd()
@@ -80,7 +82,8 @@ class TimerFd
     void expire(int times = 1)
     {
         uint64_t value = times;
-        write(client_fd, &value, sizeof(value));
+        auto _ = write(client_fd, &value, sizeof(value));
+        (void)_;
         assert(next_expiration_time != TimePoint{}); // disarmed clock should not expire
         if (interval != Duration::zero())
         {
