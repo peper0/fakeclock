@@ -8,7 +8,9 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-add_compile_options(-Wall -Wextra -Werror)
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    add_compile_options(-Wall -Wextra -Werror)
+endif()
 
 
 # Add library
@@ -36,4 +38,14 @@ enable_testing()
 
 # Add test
 add_test(NAME FakeClockTest COMMAND test_fakeclock)
+
+# Add install target
+install(TARGETS fakeclock
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib
+    RUNTIME DESTINATION bin
+    INCLUDES DESTINATION include
+)
+
+install(DIRECTORY include/ DESTINATION include)
 
