@@ -23,10 +23,8 @@ TEST(ClockSimulatorTest, now)
 TEST(ClockSimulatorTest, waitUntil)
 {
     MasterOfTime clock; // Take control of time
-    std::atomic<bool> sleep_finished = false;
-    assert_sleeps_for(clock, LONG_DURATION, [&sleep_finished] {
+    assert_sleeps_for(clock, LONG_DURATION, [] {
         ClockSimulator::getInstance().waitUntil(ClockSimulator::getInstance().now() + LONG_DURATION);
-        sleep_finished = true;
     });
 }
 
@@ -35,10 +33,12 @@ TEST(ClockSimulatorTest, timerfd)
     MasterOfTime clock; // Take control of time
     int fd = ClockSimulator::getInstance().timerfdCreate();
     ClockSimulator::getInstance().timerfdSetTime(fd, ClockSimulator::getInstance().now() + LONG_DURATION);
-    std::atomic<bool> sleep_finished = false;
-    assert_sleeps_for(clock, LONG_DURATION, [&sleep_finished, fd] {
+    assert_sleeps_for(clock, LONG_DURATION, [fd] {
         uint64_t buf;
-        read(fd, &buf, sizeof(buf));
-        sleep_finished = true;
+        auto res = read(fd, &buf, sizeof(buf));
+        EXPECT_EQ(res, sizeof(buf));
+        EXPECT_EQ(buf, 1);
+
     });
+    ::close(fd);
 }

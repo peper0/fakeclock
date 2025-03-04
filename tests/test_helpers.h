@@ -8,14 +8,7 @@
 #include <gtest/gtest.h>
 #include <thread>
 
-// inline void run_in_background(std::function<void()> f)
-// {
-//     // Create a new thread and run the function
-//     std::thread t(f);
-//     t.detach();
-// }
-
-inline bool wait_for(std::function<bool()> condition, int retries = 10000)
+inline bool wait_for(std::function<bool()> condition, int retries = 100000)
 {
     while (!condition() && retries > 0)
     {
@@ -28,9 +21,8 @@ inline bool wait_for(std::function<bool()> condition, int retries = 10000)
 inline void assert_sleeps_for(MasterOfTime &cc, FakeClock::duration duration, std::function<void()> sleep_fn)
 {
     std::atomic<bool> sleep_finished = false;
-    std::mutex m;
 
-    std::thread t([&sleep_finished, &sleep_fn] {
+    std::thread t([&sleep_finished, &sleep_fn, &m] {
         sleep_fn();
         sleep_finished = true;
     });

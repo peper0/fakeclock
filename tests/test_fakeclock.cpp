@@ -20,12 +20,14 @@ TEST(FakeClockTest, select)
         fd_set readfds;
         FD_ZERO(&readfds);
         int fds[2];
-        pipe(fds);
+        int res = pipe(fds);
+        ASSERT_EQ(res, 0);
         FD_SET(fds[0], &readfds);
-        // select_result = select(1, &readfds, nullptr, nullptr, &tv);
         select_result = select(fds[0] + 1, &readfds, nullptr, nullptr, &tv);
-        close(fds[0]);
-        close(fds[1]);
+        int close_ret = close(fds[0]);
+        ASSERT_EQ(close_ret, 0);
+        close_ret = close(fds[1]);
+        ASSERT_EQ(close_ret, 0);
         operation_finished = true;
     });
     ASSERT_EQ(select_result, 0);

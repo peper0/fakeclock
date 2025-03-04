@@ -28,7 +28,8 @@ TEST(FakeClockBoostTest, asio_steady_timer_wait)
     boost::asio::io_context io_context;
     boost::asio::steady_timer timer(io_context, STEP_DURATION);
     bool timer_expired = false;
-    timer.async_wait([&timer_expired](const boost::system::error_code &ec) { //
+    timer.async_wait([&timer_expired](const boost::system::error_code &ec) {
+        ASSERT_FALSE(ec);
         timer_expired = true;
     });
     io_context.poll();
@@ -36,7 +37,8 @@ TEST(FakeClockBoostTest, asio_steady_timer_wait)
     clock.advance(STEP_DURATION);
     io_context.run_one();
     ASSERT_TRUE(timer_expired);
-    timer.cancel();
+    auto cancelled = timer.cancel();
+    ASSERT_EQ(cancelled, 0);
 }
 
 TEST(FakeClockBoostTest, asio_steady_timer_wait_in_background)
@@ -47,6 +49,7 @@ TEST(FakeClockBoostTest, asio_steady_timer_wait_in_background)
     boost::asio::steady_timer timer(io_context, STEP_DURATION);
     std::atomic<bool> timer_expired = false;
     timer.async_wait([&timer_expired](const boost::system::error_code &ec) { //
+        ASSERT_FALSE(ec);
         timer_expired = true;
     });
     io_context.poll();
