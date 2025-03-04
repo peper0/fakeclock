@@ -1,0 +1,33 @@
+name: Build and Test
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        compiler: [gcc, clang]
+        include:
+          - compiler: gcc
+            cxx: g++
+          - compiler: clang
+            cxx: clang++
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      
+    - name: Install dependencies
+      run: sudo apt-get update && sudo apt-get install -y build-essential cmake libgtest-dev libboost-all-dev
+
+    - name: Configure CMake
+      run: cmake -B build -DCMAKE_CXX_COMPILER=${{ matrix.cxx }}
+      
+    - name: Build
+      run: cmake --build build
+
+    - name: Run tests
+      run: cd build && ctest --output-on-failure
+
+
