@@ -22,7 +22,7 @@ inline void assert_sleeps_for(MasterOfTime &cc, FakeClock::duration duration, st
 {
     std::atomic<bool> sleep_finished = false;
 
-    std::thread t([&sleep_finished, &sleep_fn, &m] {
+    std::thread t([&sleep_finished, &sleep_fn] {
         sleep_fn();
         sleep_finished = true;
     });
