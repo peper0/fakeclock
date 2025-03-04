@@ -96,7 +96,7 @@ void ClockSimulator::waitUntil(TimePoint tp)
     cv_.wait(lock, [&] {
         if (!isIntercepting())
         {
-            std::cerr << "Error: FakeClock destroyed during some wait operation" << std::endl;
+            std::cerr << "fakeclock error: MasterOfTime destroyed during some wait operation" << std::endl;
             return true;
         }
         return fake_time_ >= tp;
@@ -117,6 +117,7 @@ int ClockSimulator::timerfdCreate()
 {
     std::lock_guard<std::mutex> lock(mutex_);
     TimerFd timer_fd;
+    timer_fd.open();
     int client_fd = timer_fd.getClientFd();
 
     {
@@ -129,7 +130,7 @@ int ClockSimulator::timerfdCreate()
         }
     }
 
-    timerfds_.insert({client_fd, std::move(timer_fd)});
+    timerfds_.emplace(client_fd, std::move(timer_fd));
     return client_fd;
 }
 
@@ -153,7 +154,7 @@ void ClockSimulator::timerfdGetTime(int fd, itimerspec *curr_value)
     auto &timerfd = getTimerfd(fd);
 
     auto expiration_time = timerfd.get_expiration_time();
-    if (expiration_time == DISARM_TIME)
+    if (expiration_time == TimerFd::DISARM_TIME)
     {
         curr_value->it_value = {0, 0}; // Disarmed
     }
