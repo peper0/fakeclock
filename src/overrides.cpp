@@ -20,52 +20,9 @@ using Duration = ClockSimulator::Duration;
 
 extern "C"
 {
-    typedef unsigned int (*sleep_t)(unsigned int);
-    typedef int (*usleep_t)(useconds_t);
-    typedef int (*nanosleep_t)(const struct timespec *, struct timespec *);
-    typedef int (*gettimeofday_t)(struct timeval *, void *);
-    typedef int (*clock_gettime_t)(clockid_t, struct timespec *);
-    typedef int (*poll_t)(struct pollfd *, nfds_t, int);
-    typedef int (*epoll_wait_t)(int, struct epoll_event *, int, int);
-    typedef int (*select_t)(int, fd_set *, fd_set *, fd_set *, struct timeval *);
-    typedef int (*timerfd_settime_t)(int, int, const struct itimerspec *, struct itimerspec *);
-    typedef int (*timerfd_create_t)(int, int);
-    typedef int (*timerfd_gettime_t)(int, struct itimerspec *);
-
-    static sleep_t real_sleep = nullptr;
-    static usleep_t real_usleep = nullptr;
-    static nanosleep_t real_nanosleep = nullptr;
-    static gettimeofday_t real_gettimeofday = nullptr;
-    static clock_gettime_t real_clock_gettime = nullptr;
-    static poll_t real_poll = nullptr;
-    static epoll_wait_t real_epoll_wait = nullptr;
-    static select_t real_select = nullptr;
-    static timerfd_settime_t real_timerfd_settime = nullptr;
-    static timerfd_create_t real_timerfd_create = nullptr;
-    static timerfd_gettime_t real_timerfd_gettime = nullptr;
-
-    struct InitRealFunctions
-    {
-        InitRealFunctions()
-        {
-            real_sleep = (sleep_t)dlsym(RTLD_NEXT, "sleep");
-            real_usleep = (usleep_t)dlsym(RTLD_NEXT, "usleep");
-            real_nanosleep = (nanosleep_t)dlsym(RTLD_NEXT, "nanosleep");
-            real_gettimeofday = (gettimeofday_t)dlsym(RTLD_NEXT, "gettimeofday");
-            real_clock_gettime = (clock_gettime_t)dlsym(RTLD_NEXT, "clock_gettime");
-            real_poll = (poll_t)dlsym(RTLD_NEXT, "poll");
-            real_epoll_wait = (epoll_wait_t)dlsym(RTLD_NEXT, "epoll_wait");
-            real_select = (select_t)dlsym(RTLD_NEXT, "select");
-            real_timerfd_settime = (timerfd_settime_t)dlsym(RTLD_NEXT, "timerfd_settime");
-            real_timerfd_create = (timerfd_create_t)dlsym(RTLD_NEXT, "timerfd_create");
-            real_timerfd_gettime = (timerfd_gettime_t)dlsym(RTLD_NEXT, "timerfd_gettime");
-        }
-    };
-
-    static InitRealFunctions init_real_functions;
-
     unsigned int sleep(unsigned int seconds)
     {
+        static const auto real_sleep = (decltype(&sleep))dlsym(RTLD_NEXT, "sleep");
         auto &simulator = ClockSimulator::getInstance();
         if (!simulator.isIntercepting())
         {
@@ -81,6 +38,7 @@ extern "C"
 
     int usleep(useconds_t usec)
     {
+        static const auto real_usleep = (decltype(&usleep))dlsym(RTLD_NEXT, "usleep");
         auto &simulator = ClockSimulator::getInstance();
         if (!simulator.isIntercepting())
         {
@@ -96,6 +54,7 @@ extern "C"
 
     int nanosleep(const struct timespec *req, struct timespec *rem)
     {
+        static const auto real_nanosleep = (decltype(&nanosleep))dlsym(RTLD_NEXT, "nanosleep");
         auto &simulator = ClockSimulator::getInstance();
         if (!simulator.isIntercepting())
         {
@@ -112,6 +71,7 @@ extern "C"
 
     int gettimeofday(struct timeval *tv, void *tz)
     {
+        static const auto real_gettimeofday = (decltype(&gettimeofday))dlsym(RTLD_NEXT, "gettimeofday");
         auto &simulator = ClockSimulator::getInstance();
         if (!simulator.isIntercepting())
         {
@@ -128,6 +88,7 @@ extern "C"
 
     int clock_gettime(clockid_t clk_id, struct timespec *ts) noexcept
     {
+        static const auto real_clock_gettime = (decltype(&clock_gettime))dlsym(RTLD_NEXT, "clock_gettime");
         auto &simulator = ClockSimulator::getInstance();
         if (!simulator.isIntercepting())
         {
@@ -144,6 +105,7 @@ extern "C"
 
     int poll(struct pollfd *fds, nfds_t nfds, int timeout)
     {
+        static const auto real_poll = (decltype(&poll))dlsym(RTLD_NEXT, "poll");
         auto &simulator = ClockSimulator::getInstance();
         if (!simulator.isIntercepting() || timeout <= 0)
         {
@@ -165,6 +127,7 @@ extern "C"
 
     int epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout)
     {
+        static const auto real_epoll_wait = (decltype(&epoll_wait))dlsym(RTLD_NEXT, "epoll_wait");
         auto &simulator = ClockSimulator::getInstance();
         if (!simulator.isIntercepting() || timeout <= 0)
         {
@@ -188,6 +151,7 @@ extern "C"
 
     int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout)
     {
+        static const auto real_select = (decltype(&select))dlsym(RTLD_NEXT, "select");
         auto &simulator = ClockSimulator::getInstance();
         if (!simulator.isIntercepting() || !timeout)
         {
@@ -221,6 +185,7 @@ extern "C"
 
     int timerfd_create(int clockid, int flags)
     {
+        static const auto real_timerfd_create = (decltype(&timerfd_create))dlsym(RTLD_NEXT, "timerfd_create");
         auto &simulator = ClockSimulator::getInstance();
         if (!simulator.isIntercepting())
         {
@@ -247,6 +212,7 @@ extern "C"
 
     int timerfd_settime(int fd, int flags, const struct itimerspec *new_value, struct itimerspec *old_value)
     {
+        static const auto real_timerfd_settime = (decltype(&timerfd_settime))dlsym(RTLD_NEXT, "timerfd_settime");
         auto &simulator = ClockSimulator::getInstance();
         if (!simulator.isIntercepting())
         {
@@ -310,6 +276,7 @@ extern "C"
 
     int timerfd_gettime(int fd, struct itimerspec *curr_value)
     {
+        static const auto real_timerfd_gettime = (decltype(&timerfd_gettime))dlsym(RTLD_NEXT, "timerfd_gettime");
         auto &simulator = ClockSimulator::getInstance();
         if (!simulator.isIntercepting())
         {
