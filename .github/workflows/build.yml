@@ -8,21 +8,30 @@ jobs:
     strategy:
       matrix:
         compiler: [gcc, clang]
+        architecture: [x86_64, arm64]
         include:
           - compiler: gcc
             cxx: g++
           - compiler: clang
             cxx: clang++
+          - architecture: arm64
+            cmake_arch_flag: -DCMAKE_SYSTEM_PROCESSOR=aarch64
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
       
+    - name: Set up QEMU
+      if: matrix.architecture == 'arm64'
+      uses: docker/setup-qemu-action@v2
+      with:
+        platforms: arm64
+      
     - name: Install dependencies
       run: sudo apt-get update && sudo apt-get install -y build-essential cmake libgtest-dev libboost-all-dev
 
     - name: Configure CMake
-      run: cmake -B build -DCMAKE_CXX_COMPILER=${{ matrix.cxx }}
+      run: cmake -B build -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} ${{ matrix.cmake_arch_flag || '' }}
       
     - name: Build
       run: cmake --build build
