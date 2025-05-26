@@ -1,6 +1,4 @@
-* static initialization fiasco
 * some versioning
-* some releaase on github
 * make naming consistent
 * put whole timerfds to a separate class
 * support older standards (C++17?)

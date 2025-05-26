@@ -56,8 +56,8 @@ Below is a basic example showing how FakeClock can be used in a unit test:
 using namespace std::chrono_literals;
 
 int main() {
-    // Create a MasterOfTime instance to take control of the clock.
-    FakeClock::MasterOfTime clock;
+    // Create a MasterOfTime instance to take contlsrol of the clock.
+    MasterOfTime clock;
 
     // Capture the simulated current time.
     auto start = std::chrono::system_clock::now();
