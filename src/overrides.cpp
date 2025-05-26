@@ -342,7 +342,7 @@ extern "C"
             try
             {
                 auto now = simulator.now();
-
+                
                 if (flags & TIMER_ABSTIME)
                 {
                     // For absolute time, calculate how much time to wait
@@ -352,7 +352,7 @@ extern "C"
                         // Target time has already passed
                         return 0;
                     }
-
+                    
                     simulator.waitUntil(target_time);
                 }
                 else
@@ -361,14 +361,14 @@ extern "C"
                     auto duration = to_duration(*request);
                     simulator.waitUntil(now + duration);
                 }
-
+                
                 // In simulated time, there's no real interruption, so we always succeed
                 if (remain)
                 {
                     remain->tv_sec = 0;
                     remain->tv_nsec = 0;
                 }
-
+                
                 return 0;
             }
             catch (const std::exception &e)
