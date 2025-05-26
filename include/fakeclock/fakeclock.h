@@ -3,6 +3,9 @@
 
 #include <chrono>
 
+namespace fakeclock
+{
+
 class FakeClock
 {
   public:
@@ -22,5 +25,7 @@ class MasterOfTime
     ~MasterOfTime();
     void advance(FakeClock::duration duration);
 };
+
+} // namespace fakeclock
 
 #endif // FAKECLOCK_FAKECLOCK_H

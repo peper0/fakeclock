@@ -12,33 +12,34 @@ static constexpr auto LONG_DURATION = 3s;
 
 TEST(ClockSimulatorTest, now)
 {
-    MasterOfTime clock; // Take control of time
-    auto start = ClockSimulator::getInstance().now();
-    ClockSimulator::getInstance().advance(LONG_DURATION);
-    auto end = ClockSimulator::getInstance().now();
+    fakeclock::MasterOfTime clock; // Take control of time
+    auto start = fakeclock::ClockSimulator::getInstance().now();
+    fakeclock::ClockSimulator::getInstance().advance(LONG_DURATION);
+    auto end = fakeclock::ClockSimulator::getInstance().now();
     auto duration = end - start;
     ASSERT_EQ(duration, LONG_DURATION);
 }
 
 TEST(ClockSimulatorTest, waitUntil)
 {
-    MasterOfTime clock; // Take control of time
+    fakeclock::MasterOfTime clock; // Take control of time
     assert_sleeps_for(clock, LONG_DURATION, [] {
-        ClockSimulator::getInstance().waitUntil(ClockSimulator::getInstance().now() + LONG_DURATION);
+        fakeclock::ClockSimulator::getInstance().waitUntil(fakeclock::ClockSimulator::getInstance().now() +
+                                                           LONG_DURATION);
     });
 }
 
 TEST(ClockSimulatorTest, timerfd)
 {
-    MasterOfTime clock; // Take control of time
-    int fd = ClockSimulator::getInstance().timerfdCreate();
-    ClockSimulator::getInstance().timerfdSetTime(fd, ClockSimulator::getInstance().now() + LONG_DURATION);
+    fakeclock::MasterOfTime clock; // Take control of time
+    int fd = fakeclock::ClockSimulator::getInstance().timerfdCreate();
+    fakeclock::ClockSimulator::getInstance().timerfdSetTime(fd, fakeclock::ClockSimulator::getInstance().now() +
+                                                                    LONG_DURATION);
     assert_sleeps_for(clock, LONG_DURATION, [fd] {
         uint64_t buf;
         auto res = read(fd, &buf, sizeof(buf));
         EXPECT_EQ(res, sizeof(buf));
         EXPECT_EQ(buf, 1);
-
     });
     ::close(fd);
 }

@@ -18,7 +18,8 @@ inline bool wait_for(std::function<bool()> condition, int retries = 100000)
     return condition();
 }
 
-inline void assert_sleeps_for(MasterOfTime &cc, FakeClock::duration duration, std::function<void()> sleep_fn)
+inline void assert_sleeps_for(fakeclock::MasterOfTime &cc, fakeclock::FakeClock::duration duration,
+                              std::function<void()> sleep_fn)
 {
     std::atomic<bool> sleep_finished = false;
 

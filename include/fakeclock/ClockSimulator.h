@@ -15,6 +15,9 @@
 #include <unistd.h>
 #include <unordered_map>
 
+namespace fakeclock
+{
+
 class TimerFd
 {
     using TimePoint = FakeClock::time_point;
@@ -172,5 +175,7 @@ class ClockSimulator
     bool intercepting_ = false;
     std::unordered_map<int, TimerFd> timerfds_;
 };
+
+} // namespace fakeclock
 
 #endif // FAKECLOCK_CLOCKSIMULATOR_H

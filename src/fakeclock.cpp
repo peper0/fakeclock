@@ -15,6 +15,9 @@
 #include <unistd.h>
 #include <unordered_map>
 
+namespace fakeclock
+{
+
 MasterOfTime::MasterOfTime()
 {
     ClockSimulator::getInstance().addClock();
@@ -34,3 +37,5 @@ FakeClock::time_point FakeClock::now() noexcept
 {
     return ClockSimulator::getInstance().now();
 }
+
+} // namespace fakeclock

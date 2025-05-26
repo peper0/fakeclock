@@ -13,7 +13,7 @@ static constexpr auto LONG_DURATION = 3s;
 
 TEST(FakeClockSleepTest, usleep)
 {
-    MasterOfTime clock; // Take control of time
+    fakeclock::MasterOfTime clock; // Take control of time
     static constexpr int SLEEP_DURATION_US = 1;
     assert_sleeps_for(clock, std::chrono::microseconds(SLEEP_DURATION_US), [] {
         int ret = usleep(SLEEP_DURATION_US);
@@ -23,7 +23,7 @@ TEST(FakeClockSleepTest, usleep)
 
 TEST(FakeClockSleepTest, sleep)
 {
-    MasterOfTime clock; // Take control of time
+    fakeclock::MasterOfTime clock; // Take control of time
     static constexpr int SLEEP_DURATION_S = 1;
     assert_sleeps_for(clock, std::chrono::seconds(SLEEP_DURATION_S), [] {
         int ret = sleep(SLEEP_DURATION_S);
@@ -33,7 +33,7 @@ TEST(FakeClockSleepTest, sleep)
 
 TEST(FakeClockSleepTest, nanosleep)
 {
-    MasterOfTime clock; // Take control of time
+    fakeclock::MasterOfTime clock; // Take control of time
     static constexpr int SLEEP_DURATION_NS = 1;
     struct timespec ts;
     ts.tv_sec = 0;
@@ -46,6 +46,6 @@ TEST(FakeClockSleepTest, nanosleep)
 
 TEST(FakeClockSleepTest, this_thread_sleep_for)
 {
-    MasterOfTime clock; // Take control of time
+    fakeclock::MasterOfTime clock; // Take control of time
     assert_sleeps_for(clock, LONG_DURATION, [] { std::this_thread::sleep_for(LONG_DURATION); });
 }

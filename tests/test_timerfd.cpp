@@ -10,6 +10,7 @@
 #include <unistd.h>
 
 using namespace std::chrono_literals;
+using fakeclock::to_timespec;
 
 static constexpr auto LONG_DURATION = 3s;
 
@@ -30,15 +31,16 @@ TEST(TimerFdTest, check_eventfd_closing_detector)
     ret = close(fd2);
     ASSERT_EQ(ret, 0);
 }
+
 TEST(TimerFdTest, timerfd_create_and_settime)
 {
-    MasterOfTime clock; // Take control of time
+    fakeclock::MasterOfTime clock; // Take control of time
 
     int timer_fd = timerfd_create(CLOCK_MONOTONIC, 0);
     ASSERT_NE(timer_fd, -1);
 
     struct itimerspec new_value;
-    new_value.it_value = to_timespec(LONG_DURATION);
+    new_value.it_value = fakeclock::to_timespec(LONG_DURATION);
     new_value.it_interval.tv_sec = 0;
     new_value.it_interval.tv_nsec = 0;
 
@@ -58,7 +60,7 @@ TEST(TimerFdTest, timerfd_create_and_settime)
 
 TEST(TimerFdTest, timerfd_create_and_settime_abstime)
 {
-    MasterOfTime clock; // Take control of time
+    fakeclock::MasterOfTime clock; // Take control of time
 
     int timer_fd = timerfd_create(CLOCK_MONOTONIC, 0);
     ASSERT_NE(timer_fd, -1);
@@ -67,7 +69,7 @@ TEST(TimerFdTest, timerfd_create_and_settime_abstime)
     int ret = clock_gettime(CLOCK_MONOTONIC, &now);
     ASSERT_EQ(ret, 0);
     struct itimerspec new_value;
-    new_value.it_value = to_timespec(to_duration(now) + LONG_DURATION);
+    new_value.it_value = fakeclock::to_timespec(fakeclock::to_duration(now) + LONG_DURATION);
     new_value.it_interval.tv_sec = 0;
     new_value.it_interval.tv_nsec = 0;
 
@@ -88,7 +90,7 @@ TEST(TimerFdTest, timerfd_create_and_settime_abstime)
 
 TEST(TimerFdTest, timerfd_create_and_settime_abstime_repeated)
 {
-    MasterOfTime clock; // Take control of time
+    fakeclock::MasterOfTime clock; // Take control of time
 
     int timer_fd = timerfd_create(CLOCK_MONOTONIC, 0);
     ASSERT_NE(timer_fd, -1);
@@ -97,8 +99,8 @@ TEST(TimerFdTest, timerfd_create_and_settime_abstime_repeated)
     int ret = clock_gettime(CLOCK_MONOTONIC, &now);
     ASSERT_EQ(ret, 0);
     struct itimerspec new_value;
-    new_value.it_value = to_timespec(to_duration(now) + LONG_DURATION);
-    new_value.it_interval = to_timespec(1s); // Repeated expiration every 1 second
+    new_value.it_value = fakeclock::to_timespec(fakeclock::to_duration(now) + LONG_DURATION);
+    new_value.it_interval = fakeclock::to_timespec(1s); // Repeated expiration every 1 second
 
     int res = timerfd_settime(timer_fd, TFD_TIMER_ABSTIME, &new_value, nullptr);
     ASSERT_EQ(res, 0);
@@ -122,13 +124,13 @@ TEST(TimerFdTest, timerfd_create_and_settime_abstime_repeated)
 
 TEST(TimerFdTest, timerfd_gettime)
 {
-    MasterOfTime clock; // Take control of time
+    fakeclock::MasterOfTime clock; // Take control of time
 
     int timer_fd = timerfd_create(CLOCK_MONOTONIC, 0);
     ASSERT_NE(timer_fd, -1);
 
     struct itimerspec new_value;
-    new_value.it_value = to_timespec(LONG_DURATION);
+    new_value.it_value = fakeclock::to_timespec(LONG_DURATION);
     new_value.it_interval.tv_sec = 0;
     new_value.it_interval.tv_nsec = 0;
 
@@ -149,7 +151,7 @@ TEST(TimerFdTest, timerfd_gettime)
 
 TEST(TimerFdTest, timerfd_repeated_multiple_reads)
 {
-    MasterOfTime clock;
+    fakeclock::MasterOfTime clock;
     int timer_fd = timerfd_create(CLOCK_MONOTONIC, 0);
     ASSERT_NE(timer_fd, -1);
 
@@ -186,7 +188,7 @@ TEST(TimerFdTest, timerfd_repeated_multiple_reads)
 // 2. Disarming the timer: setting the timeout to 0 should stop the timer.
 TEST(TimerFdTest, timerfd_disarm)
 {
-    MasterOfTime clock; // Take control of time
+    fakeclock::MasterOfTime clock; // Take control of time
 
     int timer_fd = timerfd_create(CLOCK_MONOTONIC, 0);
     ASSERT_NE(timer_fd, -1);
@@ -216,7 +218,7 @@ TEST(TimerFdTest, timerfd_disarm)
 // 3. Retrieving the old value via timerfd_settime.
 TEST(TimerFdTest, timerfd_settime_old_value)
 {
-    MasterOfTime clock; // Take control of time
+    fakeclock::MasterOfTime clock; // Take control of time
 
     int timer_fd = timerfd_create(CLOCK_MONOTONIC, 0);
     ASSERT_NE(timer_fd, -1);
@@ -236,7 +238,7 @@ TEST(TimerFdTest, timerfd_settime_old_value)
     res = timerfd_settime(timer_fd, 0, &new_value, &old_value);
     ASSERT_EQ(res, 0);
 
-    auto remaining_old = to_duration(old_value.it_value);
+    auto remaining_old = fakeclock::to_duration(old_value.it_value);
     EXPECT_EQ(remaining_old, 2s);
     res = close(timer_fd);
     ASSERT_EQ(res, 0);
@@ -245,7 +247,7 @@ TEST(TimerFdTest, timerfd_settime_old_value)
 // 4. Accumulated expirations: ensuring that multiple expirations are counted.
 TEST(TimerFdTest, timerfd_repeated_expirations_accumulate)
 {
-    MasterOfTime clock; // Take control of time
+    fakeclock::MasterOfTime clock; // Take control of time
 
     int timer_fd = timerfd_create(CLOCK_MONOTONIC, 0);
     ASSERT_NE(timer_fd, -1);
@@ -273,7 +275,7 @@ TEST(TimerFdTest, timerfd_repeated_expirations_accumulate)
 // 5. Invalid nanosecond value: timerfd_settime should fail when tv_nsec is out of range.
 TEST(TimerFdTest, timerfd_settime_invalid_nsec)
 {
-    MasterOfTime clock; // Take control of time
+    fakeclock::MasterOfTime clock; // Take control of time
 
     int timer_fd = timerfd_create(CLOCK_MONOTONIC, 0);
     ASSERT_NE(timer_fd, -1);
@@ -295,7 +297,7 @@ TEST(TimerFdTest, timerfd_settime_invalid_nsec)
 // 6. Checking interval via timerfd_gettime for a periodic timer.
 TEST(TimerFdTest, timerfd_gettime_interval)
 {
-    MasterOfTime clock; // Take control of time
+    fakeclock::MasterOfTime clock; // Take control of time
 
     int timer_fd = timerfd_create(CLOCK_MONOTONIC, 0);
     ASSERT_NE(timer_fd, -1);
@@ -311,10 +313,10 @@ TEST(TimerFdTest, timerfd_gettime_interval)
     res = timerfd_gettime(timer_fd, &curr_value);
     ASSERT_EQ(res, 0);
 
-    auto interval = to_duration(curr_value.it_interval);
+    auto interval = fakeclock::to_duration(curr_value.it_interval);
     EXPECT_EQ(interval, 1s);
 
-    auto remaining = to_duration(curr_value.it_value);
+    auto remaining = fakeclock::to_duration(curr_value.it_value);
     EXPECT_EQ(remaining, 2s);
 
     res = close(timer_fd);
