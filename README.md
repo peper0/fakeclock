@@ -76,20 +76,8 @@ int main() {
 }
 ```
 
-*Note:* This example assumes you include the appropriate header files from FakeClock.
 
----
 
-## Supported Platforms
-
-- **Linux:** Current support.
-- **Other Platforms:** Work is in progress. See the TODO list below for plans to extend support to Windows and macOS.
-
----
-
-## Documentation & API Reference
-
-For a detailed API reference and advanced usage scenarios, please refer to the [FakeClock Documentation](https://github.com/yourusername/fakeclock/wiki) (coming soon).
 
 ---
 
@@ -114,31 +102,7 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 ## Contact
 
-For questions, suggestions, or issues, please open an issue on our [GitHub repository](https://github.com/yourusername/fakeclock/issues) or contact the maintainers via email at [your.email@example.com](mailto:your.email@example.com).
+For questions, suggestions, or issues, please open an issue on our [GitHub repository](https://github.com/peper0/fakeclock/issues) or contact the maintainers via email at [tomasz@lakota.pl](mailto:tomasz@lakota.pl).
 
 ---
 
-## Future Work / TODO List
-
-- **Platform Extensions:**
-  - [ ] Extend support to **Windows** and **macOS**.
-- **Build System:**
-  - [ ] Evaluate if sticking with CMake is optimal long-term or if an alternative build system would be beneficial.
-- **Documentation Enhancements:**
-  - [ ] Create a comprehensive API reference on the project wiki.
-  - [ ] Add advanced usage examples and integration guides.
-- **Testing Improvements:**
-  - [ ] Increase unit test coverage, including edge cases for legacy and external code.
-  - [ ] Develop integration tests for scenarios where the clock is not dependency-injected.
-- **Additional Features:**
-  - [ ] Explore options for an optional header-only mode (if feasible in the future).
-  - [ ] Add more simulation functions (e.g., for high-resolution timers or additional C++ time functions).
-- **Community & Contribution:**
-  - [ ] Set up a discussion forum or GitHub Discussions page for user support and ideas.
-  - [ ] Improve contribution guidelines with detailed examples.
-
----
-
-By keeping this README updated and using the TODO list to guide future improvements, FakeClock can become an even more approachable and robust tool for developers looking to create deterministic, efficient tests.
-
-If you have any additional details or questions, let me know!
