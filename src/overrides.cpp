@@ -303,6 +303,65 @@ extern "C"
             }
         }
     }
+
+    int clock_nanosleep(clockid_t clock_id, int flags, const struct timespec *request, struct timespec *remain)
+    {
+        static const auto real_clock_nanosleep = (decltype(&clock_nanosleep))dlsym(RTLD_NEXT, "clock_nanosleep");
+        auto &simulator = fakeclock::ClockSimulator::getInstance();
+        if (!simulator.isIntercepting())
+        {
+            return real_clock_nanosleep(clock_id, flags, request, remain);
+        }
+        else
+        {
+            if (!request)
+            {
+                return EFAULT;
+            }
+
+            if (request->tv_nsec < 0 || request->tv_nsec >= 1000000000)
+            {
+                return EINVAL;
+            }
+
+            try
+            {
+                auto now = simulator.now();
+                
+                if (flags & TIMER_ABSTIME)
+                {
+                    // For absolute time, calculate how much time to wait
+                    auto target_time = TimePoint(to_duration(*request));
+                    if (target_time <= now)
+                    {
+                        // Target time has already passed
+                        return 0;
+                    }
+                    
+                    simulator.waitUntil(target_time);
+                }
+                else
+                {
+                    // For relative time, simply wait for the specified duration
+                    auto duration = to_duration(*request);
+                    simulator.waitUntil(now + duration);
+                }
+                
+                // In simulated time, there's no real interruption, so we always succeed
+                if (remain)
+                {
+                    remain->tv_sec = 0;
+                    remain->tv_nsec = 0;
+                }
+                
+                return 0;
+            }
+            catch (const std::exception &e)
+            {
+                return EFAULT;
+            }
+        }
+    }
 }
 
 // TODO:
@@ -310,7 +369,6 @@ extern "C"
 //  timer_settime
 //  timer_gettime
 //  clock_settime
-//  clock_nanosleep
 //  clock_adjtime
 //  clock_getres
 //  clock_getcpuclockid
