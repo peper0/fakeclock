@@ -76,13 +76,6 @@ int main() {
 
 ## Contributing
 
-Contributions are welcome! To contribute:
-
-1. Fork the repository.
-2. Create a feature branch (`git checkout -b feature/my-new-feature`).
-3. Commit your changes and push your branch.
-4. Submit a pull request.
-
 Please follow our [CONTRIBUTING.md](CONTRIBUTING.md) guidelines for code style and testing.
 
 ---
@@ -92,10 +85,3 @@ Please follow our [CONTRIBUTING.md](CONTRIBUTING.md) guidelines for code style a
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
 ---
-
-## Contact
-
-For questions, suggestions, or issues, please open an issue on our [GitHub repository](https://github.com/peper0/fakeclock/issues) or contact the maintainers via email at [tomasz@lakota.pl](mailto:tomasz@lakota.pl).
-
----
-
