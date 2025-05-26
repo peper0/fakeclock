@@ -38,5 +38,16 @@ jobs:
 
     - name: Run tests
       run: cd build && ctest --output-on-failure
+      
+    - name: Run README example
+      run: |
+        cd build
+        ./readme_example
+        if [ $? -eq 0 ]; then
+          echo "README example ran successfully with exit code 0"
+        else
+          echo "README example failed with non-zero exit code"
+          exit 1
+        fi
 
 

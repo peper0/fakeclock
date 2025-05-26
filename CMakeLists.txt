@@ -39,6 +39,35 @@ enable_testing()
 # Add test
 add_test(NAME FakeClockTest COMMAND test_fakeclock)
 
+# Option to build examples
+option(BUILD_EXAMPLES "Build example programs" ON)
+
+# Build examples if enabled
+if(BUILD_EXAMPLES)
+    # Create directory for example
+    file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/examples)
+    
+    # Extract example from README
+    add_custom_command(
+        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/examples/readme_example.cpp
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/examples
+        COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/scripts/extract_readme_example.py
+                ${CMAKE_CURRENT_SOURCE_DIR}/README.md
+                ${CMAKE_CURRENT_BINARY_DIR}/examples/readme_example.cpp
+        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/README.md
+                ${CMAKE_CURRENT_SOURCE_DIR}/scripts/extract_readme_example.py
+        COMMENT "Extracting example from README.md"
+    )
+    
+    # Add example executable (using the extracted code)
+    add_executable(readme_example ${CMAKE_CURRENT_BINARY_DIR}/examples/readme_example.cpp)
+    target_link_libraries(readme_example fakeclock)
+    
+    # Make sure the example is extracted before building
+    add_custom_target(extract_example DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/examples/readme_example.cpp)
+    add_dependencies(readme_example extract_example)
+endif()
+
 # Add install target
 install(TARGETS fakeclock
     LIBRARY DESTINATION lib
