@@ -2,6 +2,9 @@
 #include <chrono>
 #include <sys/time.h>
 
+namespace fakeclock
+{
+
 inline timeval to_timeval(std::chrono::nanoseconds us)
 {
     timeval tv;
@@ -22,3 +25,5 @@ inline std::chrono::nanoseconds to_duration(const timespec &ts)
 {
     return std::chrono::seconds(ts.tv_sec) + std::chrono::nanoseconds(ts.tv_nsec);
 }
+
+} // namespace fakeclock

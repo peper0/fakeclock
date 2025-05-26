@@ -1,10 +1,6 @@
 # FakeClock
 
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/yourusername/fakeclock)  
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)  
-[![Version: 0.1](https://img.shields.io/badge/Version-0.1-orange.svg)](https://github.com/yourusername/fakeclock/releases)
-
-FakeClock is a simple C++ library for simulating and manipulating time in your unit tests. It replaces select standard C++ time functions with a controllable clock—making your tests both fast and deterministic. Although primarily designed for legacy or external code that cannot easily inject a time source, FakeClock can also benefit new code that isn’t architected for dependency injection.
+FakeClock is a simple C++ library for simulating and manipulating time in your unit tests. It replaces select standard C++ time functions with a controllable clock—making your tests both fast and deterministic. Although primarily designed for legacy or external code that cannot easily inject a time source, FakeClock can also benefit new code that isn't architected for dependency injection.
 
 ---
 
@@ -56,8 +52,8 @@ Below is a basic example showing how FakeClock can be used in a unit test:
 using namespace std::chrono_literals;
 
 int main() {
-    // Create a MasterOfTime instance to take contlsrol of the clock.
-    MasterOfTime clock;
+    // Create a MasterOfTime instance to take control of the clock.
+    fakeclock::MasterOfTime clock;
 
     // Capture the simulated current time.
     auto start = std::chrono::system_clock::now();
@@ -75,9 +71,6 @@ int main() {
     return 0;
 }
 ```
-
-
-
 
 ---
 

@@ -9,9 +9,12 @@
 #include <thread>
 using namespace std::chrono_literals;
 
+// Prefix namespace for MasterOfTime
+using fakeclock::MasterOfTime;
+
 TEST(FakeClockBoostTest, boost_posix_time_local_time)
 {
-    MasterOfTime clock; // Take control of time
+    fakeclock::MasterOfTime clock; // Take control of time
     static constexpr auto STEP_DURATION = 1ms;
     boost::posix_time::ptime start = boost::posix_time::microsec_clock::local_time();
     clock.advance(STEP_DURATION);

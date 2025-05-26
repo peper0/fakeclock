@@ -12,7 +12,7 @@ static constexpr auto LONG_DURATION = 3s;
 
 TEST(FakeClockGetTest, gettimeofday)
 {
-    MasterOfTime clock; // Take control of time
+    fakeclock::MasterOfTime clock; // Take control of time
     struct timeval tv;
     int ret = gettimeofday(&tv, nullptr);
     ASSERT_EQ(ret, 0);
@@ -27,7 +27,7 @@ TEST(FakeClockGetTest, gettimeofday)
 
 TEST(FakeClockGetTest, clock_gettime)
 {
-    MasterOfTime clock; // Take control of time
+    fakeclock::MasterOfTime clock; // Take control of time
     struct timespec ts;
     int ret = clock_gettime(CLOCK_REALTIME, &ts);
     ASSERT_EQ(ret, 0);
@@ -42,7 +42,7 @@ TEST(FakeClockGetTest, clock_gettime)
 
 TEST(FakeClockGetTest, clock_gettime_monotonic)
 {
-    MasterOfTime clock; // Take control of time
+    fakeclock::MasterOfTime clock; // Take control of time
     struct timespec ts;
     int ret = clock_gettime(CLOCK_MONOTONIC, &ts);
     ASSERT_EQ(ret, 0);
@@ -57,7 +57,7 @@ TEST(FakeClockGetTest, clock_gettime_monotonic)
 
 TEST(FakeClockGetTest, clock_gettime_monotonic_raw)
 {
-    MasterOfTime clock; // Take control of time
+    fakeclock::MasterOfTime clock; // Take control of time
     struct timespec ts;
     int ret = clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
     ASSERT_EQ(ret, 0);
@@ -72,7 +72,7 @@ TEST(FakeClockGetTest, clock_gettime_monotonic_raw)
 
 TEST(FakeClockGetTest, steady_clock_now)
 {
-    MasterOfTime clock; // Take control of time
+    fakeclock::MasterOfTime clock; // Take control of time
     auto start = std::chrono::steady_clock::now();
     clock.advance(LONG_DURATION);
     auto end = std::chrono::steady_clock::now();
@@ -82,7 +82,7 @@ TEST(FakeClockGetTest, steady_clock_now)
 
 TEST(FakeClockGetTest, system_clock_now)
 {
-    MasterOfTime clock; // Take control of time
+    fakeclock::MasterOfTime clock; // Take control of time
     auto start = std::chrono::system_clock::now();
     clock.advance(LONG_DURATION);
     auto end = std::chrono::system_clock::now();
@@ -92,7 +92,7 @@ TEST(FakeClockGetTest, system_clock_now)
 
 TEST(FakeClockGetTest, high_resolution_clock_now)
 {
-    MasterOfTime clock; // Take control of time
+    fakeclock::MasterOfTime clock; // Take control of time
     auto start = std::chrono::high_resolution_clock::now();
     clock.advance(LONG_DURATION);
     auto end = std::chrono::high_resolution_clock::now();

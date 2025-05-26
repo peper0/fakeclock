@@ -12,11 +12,11 @@ static constexpr auto LONG_DURATION = 3s;
 
 TEST(FakeClockTest, select)
 {
-    MasterOfTime clock; // Take control of time
+    fakeclock::MasterOfTime clock; // Take control of time
     std::atomic<bool> operation_finished = false;
     std::atomic<int> select_result = -1;
     assert_sleeps_for(clock, LONG_DURATION, [&] {
-        struct timeval tv = to_timeval(LONG_DURATION);
+        struct timeval tv = fakeclock::to_timeval(LONG_DURATION);
         fd_set readfds;
         FD_ZERO(&readfds);
         int fds[2];

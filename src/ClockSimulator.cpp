@@ -31,6 +31,9 @@ class ScopedSigpipeIgnore
     struct sigaction new_action_;
 };
 
+namespace fakeclock
+{
+
 ClockSimulator &ClockSimulator::getInstance()
 {
     static ClockSimulator instance;
@@ -174,3 +177,5 @@ void ClockSimulator::restore()
 {
     intercepting_ = false;
 }
+
+} // namespace fakeclock
