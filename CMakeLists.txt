@@ -14,7 +14,12 @@ endif()
 
 
 # Add library
-add_library(fakeclock SHARED src/fakeclock.cpp src/ClockSimulator.cpp src/overrides.cpp)
+add_library(fakeclock SHARED 
+    src/fakeclock.cpp 
+    src/ClockSimulator.cpp 
+    src/overrides.cpp
+    src/posix_timers.cpp
+)
 
 target_include_directories(fakeclock PUBLIC include)
 
@@ -30,6 +35,7 @@ add_executable(test_fakeclock
     tests/test_sleep.cpp
     tests/test_gettime.cpp
     tests/test_clock_nanosleep.cpp
+    tests/test_posix_timer.cpp
 )
 # Link the library and Google Test to the test executable
 target_link_libraries(test_fakeclock fakeclock GTest::gtest GTest::gtest_main pthread)

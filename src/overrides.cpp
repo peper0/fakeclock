@@ -12,6 +12,7 @@
 #include <sys/epoll.h>
 #include <sys/eventfd.h>
 #include <sys/timerfd.h>
+#include <time.h>
 #include <unistd.h>
 #include <unordered_map>
 
@@ -327,7 +328,7 @@ extern "C"
             try
             {
                 auto now = simulator.now();
-                
+
                 if (flags & TIMER_ABSTIME)
                 {
                     // For absolute time, calculate how much time to wait
@@ -337,7 +338,7 @@ extern "C"
                         // Target time has already passed
                         return 0;
                     }
-                    
+
                     simulator.waitUntil(target_time);
                 }
                 else
@@ -346,14 +347,14 @@ extern "C"
                     auto duration = to_duration(*request);
                     simulator.waitUntil(now + duration);
                 }
-                
+
                 // In simulated time, there's no real interruption, so we always succeed
                 if (remain)
                 {
                     remain->tv_sec = 0;
                     remain->tv_nsec = 0;
                 }
-                
+
                 return 0;
             }
             catch (const std::exception &e)
@@ -365,9 +366,6 @@ extern "C"
 }
 
 // TODO:
-//  timer_create
-//  timer_settime
-//  timer_gettime
 //  clock_settime
 //  clock_adjtime
 //  clock_getres
@@ -379,7 +377,6 @@ extern "C"
 //  clock_nanosleep64
 //  timer_gettime64
 //  timer_settime64
-//  timerfd_gettime
 //  timerfd_gettime64
 //  timerfd_settime64
 //  socket operations with timeouts (e.g., connect, recv, send)
