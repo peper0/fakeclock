@@ -14,7 +14,12 @@ endif()
 
 
 # Add library
-add_library(fakeclock SHARED src/fakeclock.cpp src/ClockSimulator.cpp src/overrides.cpp)
+add_library(fakeclock SHARED 
+    src/fakeclock.cpp 
+    src/ClockSimulator.cpp 
+    src/overrides.cpp
+    src/posix_timers.cpp
+)
 
 target_include_directories(fakeclock PUBLIC include)
 
