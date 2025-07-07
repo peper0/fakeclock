@@ -13,6 +13,7 @@
 #include <sys/eventfd.h>
 #include <sys/syscall.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <unordered_map>
 
 namespace fakeclock
@@ -121,7 +122,13 @@ class TimerFd
     bool client_closed() const
     {
         assert(isValid());
-        return syscall(SYS_kcmp, getpid(), getpid(), KCMP_FILE, client_fd, my_fd) != 0;
+        long res = syscall(SYS_kcmp, getpid(), getpid(), KCMP_FILE, client_fd, my_fd);
+        if (res == -1 && errno == ENOSYS)
+        {
+            // kcmp not available; fall back to checking the client descriptor
+            return fcntl(client_fd, F_GETFD) == -1;
+        }
+        return res != 0;
     }
     bool isValid() const
     {
