@@ -5,6 +5,7 @@
 #include <fakeclock/common.h>
 #include <fakeclock/fakeclock.h>
 #include <functional>
+#include <future>
 #include <gtest/gtest.h>
 #include <thread>
 
@@ -23,12 +24,12 @@ inline void assert_sleeps_for(fakeclock::MasterOfTime &cc, fakeclock::FakeClock:
 {
     std::atomic<bool> sleep_finished = false;
 
-    std::thread t([&sleep_finished, &sleep_fn] {
+    auto f = std::async(std::launch::async, [&sleep_finished, &sleep_fn] {
         sleep_fn();
         sleep_finished = true;
     });
     ASSERT_FALSE(wait_for([&] -> bool { return sleep_finished; }));
     cc.advance(duration);
     ASSERT_TRUE(wait_for([&] -> bool { return sleep_finished; }));
-    t.join();
+    f.get(); // Ensure the thread has finished and forward any exceptions
 }
