@@ -6,8 +6,8 @@
 #include <chrono>
 #include <condition_variable>
 #include <fakeclock/fakeclock.h>
+#include <fstream>
 #include <iostream>
-#include <linux/kcmp.h>
 #include <mutex>
 #include <queue>
 #include <sys/eventfd.h>
@@ -17,6 +17,27 @@
 
 namespace fakeclock
 {
+
+inline bool are_fds_equivalent(int fd1, int fd2)
+{
+#if 0
+    // we cannot SYS_kcmp here because sometimes we get EPERM on it (e.g. in docker)
+    long res = syscall(SYS_kcmp, getpid(), getpid(), KCMP_FILE, fd1, fd2);
+    return res == 0;
+#else
+    // compare strings from /proc/self/fdinfo/<fd1> with /proc/self/fdinfo/<fd2>
+
+    std::ifstream fd1_info("/proc/self/fdinfo/" + std::to_string(fd1));
+    std::ifstream fd2_info("/proc/self/fdinfo/" + std::to_string(fd2));
+    if (!fd1_info.is_open() || !fd2_info.is_open())
+    {
+        return false;
+    }
+    std::string info1((std::istreambuf_iterator<char>(fd1_info)), std::istreambuf_iterator<char>());
+    std::string info2((std::istreambuf_iterator<char>(fd2_info)), std::istreambuf_iterator<char>());
+    return info1 == info2;
+#endif
+}
 
 class TimerFd
 {
@@ -121,7 +142,7 @@ class TimerFd
     bool client_closed() const
     {
         assert(isValid());
-        return syscall(SYS_kcmp, getpid(), getpid(), KCMP_FILE, client_fd, my_fd) != 0;
+        return !are_fds_equivalent(client_fd, my_fd);
     }
     bool isValid() const
     {

@@ -1,6 +1,7 @@
 #include "test_helpers.h"
 #include <atomic>
 #include <chrono>
+#include <fakeclock/ClockSimulator.h>
 #include <fakeclock/fakeclock.h>
 #include <gtest/gtest.h>
 #include <linux/kcmp.h>
@@ -14,7 +15,7 @@ using fakeclock::to_timespec;
 
 static constexpr auto LONG_DURATION = 3s;
 
-TEST(TimerFdTest, check_eventfd_closing_detector)
+TEST(TimerFdTest, are_fds_equivalent)
 {
     int fd = eventfd(0, 0);
     int fd2 = dup(fd);
@@ -23,11 +24,11 @@ TEST(TimerFdTest, check_eventfd_closing_detector)
     ASSERT_NE(fd3, -1);
     ASSERT_NE(fd, -1);
     ASSERT_NE(fd2, -1);
-    EXPECT_EQ(syscall(SYS_kcmp, getpid(), getpid(), KCMP_FILE, fd, fd2), 0);
-    EXPECT_NE(syscall(SYS_kcmp, getpid(), getpid(), KCMP_FILE, fd, fd3), 0);
+    EXPECT_TRUE(fakeclock::are_fds_equivalent(fd, fd2));
+    EXPECT_FALSE(fakeclock::are_fds_equivalent(fd, fd3));
     int ret = close(fd);
     ASSERT_EQ(ret, 0);
-    EXPECT_NE(syscall(SYS_kcmp, getpid(), getpid(), KCMP_FILE, fd, fd2), 0);
+    EXPECT_FALSE(fakeclock::are_fds_equivalent(fd, fd2));
     ret = close(fd2);
     ASSERT_EQ(ret, 0);
 }
