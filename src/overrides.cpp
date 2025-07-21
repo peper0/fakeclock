@@ -12,6 +12,8 @@
 #include <sys/epoll.h>
 #include <sys/eventfd.h>
 #include <sys/timerfd.h>
+#include <sys/socket.h>
+#include <fcntl.h>
 #include <time.h>
 #include <unistd.h>
 #include <unordered_map>
@@ -20,6 +22,207 @@ using TimePoint = fakeclock::ClockSimulator::TimePoint;
 using Duration = fakeclock::ClockSimulator::Duration;
 using fakeclock::FakeClock;
 using fakeclock::to_duration;
+
+struct SocketTimeouts
+{
+    Duration recv_timeout{};
+    Duration send_timeout{};
+};
+
+static std::mutex socket_timeout_mutex;
+static std::unordered_map<int, SocketTimeouts> socket_timeouts;
+
+static Duration get_socket_timeout(int fd, int optname)
+{
+    std::lock_guard<std::mutex> lock(socket_timeout_mutex);
+    auto it = socket_timeouts.find(fd);
+    if (it == socket_timeouts.end())
+    {
+        return Duration::zero();
+    }
+    if (optname == SO_RCVTIMEO)
+    {
+        return it->second.recv_timeout;
+    }
+    if (optname == SO_SNDTIMEO)
+    {
+        return it->second.send_timeout;
+    }
+    return Duration::zero();
+}
+
+static void set_socket_timeout(int fd, int optname, Duration timeout)
+{
+    std::lock_guard<std::mutex> lock(socket_timeout_mutex);
+    auto &entry = socket_timeouts[fd];
+    if (optname == SO_RCVTIMEO)
+    {
+        entry.recv_timeout = timeout;
+    }
+    else if (optname == SO_SNDTIMEO)
+    {
+        entry.send_timeout = timeout;
+    }
+}
+
+static void clear_socket_timeout(int fd)
+{
+    std::lock_guard<std::mutex> lock(socket_timeout_mutex);
+    socket_timeouts.erase(fd);
+}
+
+extern "C"
+{
+    int setsockopt(int sockfd, int level, int optname, const void *optval, socklen_t optlen)
+    {
+        static const auto real_setsockopt = (decltype(&setsockopt))dlsym(RTLD_NEXT, "setsockopt");
+        auto &simulator = fakeclock::ClockSimulator::getInstance();
+        if (simulator.isIntercepting() && level == SOL_SOCKET && optval &&
+            optlen >= sizeof(timeval) && (optname == SO_RCVTIMEO || optname == SO_SNDTIMEO))
+        {
+            const timeval *tv = reinterpret_cast<const timeval *>(optval);
+            auto duration = std::chrono::seconds(tv->tv_sec) + std::chrono::microseconds(tv->tv_usec);
+            set_socket_timeout(sockfd, optname, duration);
+        }
+        return real_setsockopt(sockfd, level, optname, optval, optlen);
+    }
+
+    int getsockopt(int sockfd, int level, int optname, void *optval, socklen_t *optlen)
+    {
+        static const auto real_getsockopt = (decltype(&getsockopt))dlsym(RTLD_NEXT, "getsockopt");
+        auto &simulator = fakeclock::ClockSimulator::getInstance();
+        int res = real_getsockopt(sockfd, level, optname, optval, optlen);
+        if (res == 0 && simulator.isIntercepting() && level == SOL_SOCKET && optval && optlen &&
+            *optlen >= sizeof(timeval) && (optname == SO_RCVTIMEO || optname == SO_SNDTIMEO))
+        {
+            timeval tv = fakeclock::to_timeval(get_socket_timeout(sockfd, optname));
+            memcpy(optval, &tv, sizeof(tv));
+        }
+        return res;
+    }
+
+    int close(int fd)
+    {
+        static const auto real_close = (decltype(&close))dlsym(RTLD_NEXT, "close");
+        clear_socket_timeout(fd);
+        return real_close(fd);
+    }
+
+    ssize_t recv(int sockfd, void *buf, size_t len, int flags)
+    {
+        static const auto real_recv = (decltype(&recv))dlsym(RTLD_NEXT, "recv");
+        auto &simulator = fakeclock::ClockSimulator::getInstance();
+        if (!simulator.isIntercepting())
+        {
+            return real_recv(sockfd, buf, len, flags);
+        }
+
+        auto timeout = get_socket_timeout(sockfd, SO_RCVTIMEO);
+        if (timeout > Duration::zero())
+        {
+            struct pollfd pfd = {sockfd, POLLIN, 0};
+            int ret = poll(&pfd, 1, std::chrono::duration_cast<std::chrono::milliseconds>(timeout).count());
+            if (ret <= 0)
+            {
+                if (ret == 0)
+                {
+                    errno = EAGAIN;
+                }
+                return -1;
+            }
+        }
+        return real_recv(sockfd, buf, len, flags);
+    }
+
+    ssize_t send(int sockfd, const void *buf, size_t len, int flags)
+    {
+        static const auto real_send = (decltype(&send))dlsym(RTLD_NEXT, "send");
+        auto &simulator = fakeclock::ClockSimulator::getInstance();
+        if (!simulator.isIntercepting())
+        {
+            return real_send(sockfd, buf, len, flags);
+        }
+
+        auto timeout = get_socket_timeout(sockfd, SO_SNDTIMEO);
+        if (timeout > Duration::zero())
+        {
+            struct pollfd pfd = {sockfd, POLLOUT, 0};
+            int ret = poll(&pfd, 1, std::chrono::duration_cast<std::chrono::milliseconds>(timeout).count());
+            if (ret <= 0)
+            {
+                if (ret == 0)
+                {
+                    errno = EAGAIN;
+                }
+                return -1;
+            }
+        }
+
+        return real_send(sockfd, buf, len, flags);
+    }
+
+    int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
+    {
+        static const auto real_connect = (decltype(&connect))dlsym(RTLD_NEXT, "connect");
+        auto &simulator = fakeclock::ClockSimulator::getInstance();
+        if (!simulator.isIntercepting())
+        {
+            return real_connect(sockfd, addr, addrlen);
+        }
+
+        auto timeout = get_socket_timeout(sockfd, SO_SNDTIMEO);
+        if (timeout <= Duration::zero())
+        {
+            return real_connect(sockfd, addr, addrlen);
+        }
+
+        int flags = fcntl(sockfd, F_GETFL, 0);
+        bool was_nonblock = flags & O_NONBLOCK;
+        if (!was_nonblock)
+        {
+            fcntl(sockfd, F_SETFL, flags | O_NONBLOCK);
+        }
+
+        int res = real_connect(sockfd, addr, addrlen);
+        if (res == -1 && errno == EINPROGRESS)
+        {
+            struct pollfd pfd = {sockfd, POLLOUT, 0};
+            int pr = poll(&pfd, 1, std::chrono::duration_cast<std::chrono::milliseconds>(timeout).count());
+            if (pr <= 0)
+            {
+                if (pr == 0)
+                {
+                    errno = ETIMEDOUT;
+                }
+                res = -1;
+            }
+            else
+            {
+                int err = 0;
+                socklen_t len = sizeof(err);
+                if (getsockopt(sockfd, SOL_SOCKET, SO_ERROR, &err, &len) < 0)
+                {
+                    res = -1;
+                }
+                else if (err != 0)
+                {
+                    errno = err;
+                    res = -1;
+                }
+                else
+                {
+                    res = 0;
+                }
+            }
+        }
+
+        if (!was_nonblock)
+        {
+            fcntl(sockfd, F_SETFL, flags);
+        }
+        return res;
+    }
+}
 
 extern "C"
 {
