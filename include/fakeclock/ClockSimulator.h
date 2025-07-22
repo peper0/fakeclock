@@ -162,6 +162,46 @@ class TimerFd
     int my_fd = -1;
     TimePoint next_expiration_time = DISARM_TIME;
     Duration interval = Duration::zero();
+}; 
+
+class SocketTimeoutManager
+{
+    struct Timeouts
+    {
+        std::chrono::nanoseconds recv{0};
+        std::chrono::nanoseconds send{0};
+    };
+
+  public:
+    void setRecv(int fd, std::chrono::nanoseconds t)
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        timeouts_[fd].recv = t;
+    }
+
+    void setSend(int fd, std::chrono::nanoseconds t)
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        timeouts_[fd].send = t;
+    }
+
+    std::chrono::nanoseconds getRecv(int fd) const
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        auto it = timeouts_.find(fd);
+        return it == timeouts_.end() ? std::chrono::nanoseconds{0} : it->second.recv;
+    }
+
+    std::chrono::nanoseconds getSend(int fd) const
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        auto it = timeouts_.find(fd);
+        return it == timeouts_.end() ? std::chrono::nanoseconds{0} : it->second.send;
+    }
+
+  private:
+    mutable std::mutex mutex_;
+    std::unordered_map<int, Timeouts> timeouts_;
 };
 
 class ClockSimulator
@@ -183,6 +223,9 @@ class ClockSimulator
     void timerfdSetTime(int fd, TimePoint tp, Duration interval = Duration::zero());
     void timerfdGetTime(int fd, struct itimerspec *curr_value);
 
+    SocketTimeoutManager &socketTimeouts() { return socket_timeout_manager_; }
+    const SocketTimeoutManager &socketTimeouts() const { return socket_timeout_manager_; }
+
   private:
     ClockSimulator() = default;
     void intercept();
@@ -195,6 +238,7 @@ class ClockSimulator
     std::condition_variable cv_;
     bool intercepting_ = false;
     std::unordered_map<int, TimerFd> timerfds_;
+    SocketTimeoutManager socket_timeout_manager_;
 };
 
 } // namespace fakeclock

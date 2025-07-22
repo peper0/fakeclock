@@ -10,6 +10,7 @@ FakeClock is a simple C++ library for simulating and manipulating time in your u
 - **Non-Intrusive Integration:** Replaces standard C++ functions like `std::this_thread::sleep_for` and `std::chrono::system_clock::now` without needing invasive code changes.
 - **Deterministic Testing:** Ensures that tests produce predictable results by decoupling them from the real system clock.
 - **Lightweight and Focused:** Minimalistic design with no external dependencies.
+- **Socket Timeouts:** `connect`, `recv`, and `send` respect `SO_RCVTIMEO` and `SO_SNDTIMEO` when the clock is controlled.
 
 ---
 
