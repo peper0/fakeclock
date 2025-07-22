@@ -37,3 +37,9 @@ All tasks and discussions happen in GitHub issues. You can list issues with:
 curl -sL https://api.github.com/repos/peper0/fakeclock/issues | jq '.[].title'
 ```
 Use the issue page to ask questions or propose changes.
+
+The `scripts/github_activity.py` helper script prints open issues and
+comments from open pull requests using the GitHub API. Run it with:
+```bash
+scripts/github_activity.py
+```
