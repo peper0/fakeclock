@@ -1,4 +1,4 @@
-IMERFD(2)		      System Calls Manual		    TIMERFD(2)
+TIMERFD(2)		      System Calls Manual		    TIMERFD(2)
 
 NAME
        timerfd,	 timerfd_create,  timerfd_gettime,  timerfd_settime  --	timers
