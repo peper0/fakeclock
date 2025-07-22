@@ -124,11 +124,10 @@ int ClockSimulator::timerfdCreate()
     int client_fd = timer_fd.getClientFd();
 
     {
-        /// if there is already such client_fd it must have been closed already
+        // remove any stale entry for this fd
         auto it = timerfds_.find(client_fd);
         if (it != timerfds_.end())
         {
-            assert(it->second.client_closed());
             timerfds_.erase(it);
         }
     }

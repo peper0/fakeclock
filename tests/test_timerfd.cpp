@@ -3,9 +3,8 @@
 #include <chrono>
 #include <fakeclock/fakeclock.h>
 #include <gtest/gtest.h>
-#include <linux/kcmp.h>
 #include <sys/eventfd.h>
-#include <sys/syscall.h>
+#include <fcntl.h>
 #include <sys/timerfd.h>
 #include <unistd.h>
 
@@ -23,12 +22,17 @@ TEST(TimerFdTest, check_eventfd_closing_detector)
     ASSERT_NE(fd3, -1);
     ASSERT_NE(fd, -1);
     ASSERT_NE(fd2, -1);
-    EXPECT_EQ(syscall(SYS_kcmp, getpid(), getpid(), KCMP_FILE, fd, fd2), 0);
-    EXPECT_NE(syscall(SYS_kcmp, getpid(), getpid(), KCMP_FILE, fd, fd3), 0);
+    EXPECT_NE(fcntl(fd, F_GETFD), -1);
+    EXPECT_NE(fcntl(fd2, F_GETFD), -1);
+    EXPECT_NE(fcntl(fd3, F_GETFD), -1);
     int ret = close(fd);
     ASSERT_EQ(ret, 0);
-    EXPECT_NE(syscall(SYS_kcmp, getpid(), getpid(), KCMP_FILE, fd, fd2), 0);
+    EXPECT_EQ(fcntl(fd, F_GETFD), -1);
+    EXPECT_NE(fcntl(fd2, F_GETFD), -1);
     ret = close(fd2);
+    ASSERT_EQ(ret, 0);
+    EXPECT_EQ(fcntl(fd2, F_GETFD), -1);
+    ret = close(fd3);
     ASSERT_EQ(ret, 0);
 }
 

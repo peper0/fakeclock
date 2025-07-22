@@ -7,11 +7,9 @@
 #include <condition_variable>
 #include <fakeclock/fakeclock.h>
 #include <iostream>
-#include <linux/kcmp.h>
 #include <mutex>
 #include <queue>
 #include <sys/eventfd.h>
-#include <sys/syscall.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <unordered_map>
@@ -122,13 +120,7 @@ class TimerFd
     bool client_closed() const
     {
         assert(isValid());
-        long res = syscall(SYS_kcmp, getpid(), getpid(), KCMP_FILE, client_fd, my_fd);
-        if (res == -1 && errno == ENOSYS)
-        {
-            // kcmp not available; fall back to checking the client descriptor
-            return fcntl(client_fd, F_GETFD) == -1;
-        }
-        return res != 0;
+        return fcntl(client_fd, F_GETFD) == -1;
     }
     bool isValid() const
     {
