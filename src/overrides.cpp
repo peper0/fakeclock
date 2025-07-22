@@ -1,10 +1,10 @@
 #include <atomic>
+#include <chrono>
 #include <condition_variable>
 #include <cstring>
 #include <dlfcn.h>
 #include <fakeclock/ClockSimulator.h>
 #include <fakeclock/common.h>
-#include <chrono>
 #include <iostream>
 #include <mutex>
 #include <poll.h>
@@ -171,7 +171,8 @@ extern "C"
         }
         else
         {
-            time_t result = std::chrono::duration_cast<std::chrono::seconds>(simulator.now().time_since_epoch()).count();
+            time_t result =
+                std::chrono::duration_cast<std::chrono::seconds>(simulator.now().time_since_epoch()).count();
             if (t)
             {
                 *t = result;
@@ -438,19 +439,3 @@ extern "C"
         }
     }
 }
-
-// TODO:
-//  clock_settime
-//  clock_adjtime
-//  clock_getres
-//  clock_getcpuclockid
-//  clock_gettime64
-//  clock_settime64
-//  clock_adjtime64
-//  clock_getres64
-//  clock_nanosleep64
-//  timer_gettime64
-//  timer_settime64
-//  timerfd_gettime64
-//  timerfd_settime64
-//  socket operations with timeouts (e.g., connect, recv, send)
