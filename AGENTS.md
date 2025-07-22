@@ -39,13 +39,14 @@ Working via GitHub Issues
 -------------------------
 
 All tasks and discussions happen in GitHub issues. You can list issues with:
-```bash
-curl -sL https://api.github.com/repos/peper0/fakeclock/issues | jq '.[].title'
-```
-Use the issue page to ask questions or propose changes.
-
 The `scripts/github_activity.py` helper script prints open issues and
 comments from open pull requests using the GitHub API. Run it with:
 ```bash
 scripts/github_activity.py
 ```
+
+- When you're asked to fix PR comments:
+    - Answer each comment on github. It may be simple "fixed" or "done". If you
+      disagree with the comment, explain why. If you don't understand the comment, ask for clarification.
+    - If you need to make changes, do so in the same branch as the PR.
+    - After committing changes, check for new comments on the PR (and again after successive commits).  
