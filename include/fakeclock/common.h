@@ -5,6 +5,8 @@
 namespace fakeclock
 {
 
+constexpr auto SOCKET_CHECK_INTERVAL = std::chrono::milliseconds(1);
+
 inline timeval to_timeval(std::chrono::nanoseconds us)
 {
     timeval tv;

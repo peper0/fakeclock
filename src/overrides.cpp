@@ -371,7 +371,6 @@ extern "C"
 
 extern "C" {
 
-    static constexpr auto CHECK_INTERVAL = std::chrono::milliseconds(1);
 
     int setsockopt(int sockfd, int level, int optname, const void *optval, socklen_t optlen)
     {
@@ -447,7 +446,7 @@ extern "C" {
         while (simulator.now() - start < timeout)
         {
             auto remaining = timeout - (simulator.now() - start);
-            auto step = std::min(remaining, std::chrono::duration_cast<std::chrono::nanoseconds>(CHECK_INTERVAL));
+            auto step = std::min(remaining, std::chrono::duration_cast<std::chrono::nanoseconds>(fakeclock::SOCKET_CHECK_INTERVAL));
             simulator.waitUntil(simulator.now() + step);
             ret = real_recv(sockfd, buf, len, flags | MSG_DONTWAIT);
             if (ret != -1 || errno != EAGAIN)
@@ -478,7 +477,7 @@ extern "C" {
         while (simulator.now() - start < timeout)
         {
             auto remaining = timeout - (simulator.now() - start);
-            auto step = std::min(remaining, std::chrono::duration_cast<std::chrono::nanoseconds>(CHECK_INTERVAL));
+            auto step = std::min(remaining, std::chrono::duration_cast<std::chrono::nanoseconds>(fakeclock::SOCKET_CHECK_INTERVAL));
             simulator.waitUntil(simulator.now() + step);
             ret = real_send(sockfd, buf, len, flags | MSG_DONTWAIT);
             if (ret != -1 || errno != EAGAIN)

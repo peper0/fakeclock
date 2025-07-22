@@ -2,6 +2,7 @@
 #include <atomic>
 #include <chrono>
 #include <fakeclock/fakeclock.h>
+#include <fakeclock/common.h>
 #include <gtest/gtest.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -10,7 +11,7 @@
 using namespace std::chrono_literals;
 
 static constexpr auto SOCKET_TIMEOUT = 1s;
-static constexpr auto SOCKET_CHECK_INTERVAL = 1ms;
+
 
 TEST(SocketTimeoutTest, RecvTimeout)
 {
@@ -70,7 +71,7 @@ TEST(SocketTimeoutTest, RecvDataBeforeTimeout)
 
     clock.advance(SOCKET_TIMEOUT / 2);
     ASSERT_EQ(send(sv[1], "abc", 3, 0), 3);
-    clock.advance(SOCKET_CHECK_INTERVAL);
+    clock.advance(fakeclock::SOCKET_CHECK_INTERVAL);
     receiver.join();
     EXPECT_EQ(result, 3);
     EXPECT_EQ(std::string(buf, result), "abc");
