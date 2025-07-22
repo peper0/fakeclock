@@ -10,8 +10,11 @@
 #include <queue>
 #include <stdexcept>
 #include <sys/epoll.h>
+#include <sys/types.h>
 #include <sys/eventfd.h>
 #include <sys/timerfd.h>
+#include <sys/socket.h>
+#include <fcntl.h>
 #include <time.h>
 #include <unistd.h>
 #include <unordered_map>
@@ -365,6 +368,155 @@ extern "C"
     }
 }
 
+extern "C" {
+    // Structures for storing per-socket timeout information
+    struct SocketTimeouts {
+        std::chrono::nanoseconds recv_timeout{0};
+        std::chrono::nanoseconds send_timeout{0};
+    };
+
+    static std::mutex socket_timeout_mutex;
+    static std::unordered_map<int, SocketTimeouts> socket_timeouts;
+
+    static std::chrono::nanoseconds get_timeout(int fd, bool recv)
+    {
+        std::lock_guard<std::mutex> lock(socket_timeout_mutex);
+        auto it = socket_timeouts.find(fd);
+        if (it == socket_timeouts.end())
+        {
+            return std::chrono::nanoseconds::zero();
+        }
+        return recv ? it->second.recv_timeout : it->second.send_timeout;
+    }
+
+    int setsockopt(int sockfd, int level, int optname, const void *optval, socklen_t optlen)
+    {
+        static const auto real_setsockopt = (decltype(&setsockopt))dlsym(RTLD_NEXT, "setsockopt");
+        auto &simulator = fakeclock::ClockSimulator::getInstance();
+        int ret = real_setsockopt(sockfd, level, optname, optval, optlen);
+        if (!simulator.isIntercepting() || level != SOL_SOCKET || !optval || optlen < sizeof(timeval))
+        {
+            return ret;
+        }
+
+        timeval tv;
+        memcpy(&tv, optval, sizeof(tv));
+        auto timeout = std::chrono::seconds(tv.tv_sec) + std::chrono::microseconds(tv.tv_usec);
+
+        std::lock_guard<std::mutex> lock(socket_timeout_mutex);
+        auto &entry = socket_timeouts[sockfd];
+        if (optname == SO_RCVTIMEO)
+        {
+            entry.recv_timeout = timeout;
+        }
+        else if (optname == SO_SNDTIMEO)
+        {
+            entry.send_timeout = timeout;
+        }
+        return ret;
+    }
+
+    int getsockopt(int sockfd, int level, int optname, void *optval, socklen_t *optlen)
+    {
+        static const auto real_getsockopt = (decltype(&getsockopt))dlsym(RTLD_NEXT, "getsockopt");
+        auto &simulator = fakeclock::ClockSimulator::getInstance();
+        int ret = real_getsockopt(sockfd, level, optname, optval, optlen);
+        if (!simulator.isIntercepting() || level != SOL_SOCKET || !optval || !optlen || *optlen < sizeof(timeval))
+        {
+            return ret;
+        }
+
+        std::lock_guard<std::mutex> lock(socket_timeout_mutex);
+        auto it = socket_timeouts.find(sockfd);
+        if (it == socket_timeouts.end())
+        {
+            return ret;
+        }
+        timeval tv{};
+        auto timeout = (optname == SO_RCVTIMEO) ? it->second.recv_timeout : it->second.send_timeout;
+        tv.tv_sec = std::chrono::duration_cast<std::chrono::seconds>(timeout).count();
+        tv.tv_usec = std::chrono::duration_cast<std::chrono::microseconds>(timeout).count() % 1000000;
+        memcpy(optval, &tv, sizeof(tv));
+        *optlen = sizeof(tv);
+        return ret;
+    }
+
+    ssize_t recv(int sockfd, void *buf, size_t len, int flags)
+    {
+        static const auto real_recv = (decltype(&recv))dlsym(RTLD_NEXT, "recv");
+        auto &simulator = fakeclock::ClockSimulator::getInstance();
+        if (!simulator.isIntercepting())
+        {
+            return real_recv(sockfd, buf, len, flags);
+        }
+
+        auto timeout = get_timeout(sockfd, true);
+        ssize_t ret = real_recv(sockfd, buf, len, flags | MSG_DONTWAIT);
+        if (ret != -1 || errno != EAGAIN || timeout.count() == 0)
+        {
+            return ret;
+        }
+
+        simulator.waitUntil(simulator.now() + timeout);
+        return real_recv(sockfd, buf, len, flags | MSG_DONTWAIT);
+    }
+
+    ssize_t send(int sockfd, const void *buf, size_t len, int flags)
+    {
+        static const auto real_send = (decltype(&send))dlsym(RTLD_NEXT, "send");
+        auto &simulator = fakeclock::ClockSimulator::getInstance();
+        if (!simulator.isIntercepting())
+        {
+            return real_send(sockfd, buf, len, flags);
+        }
+
+        auto timeout = get_timeout(sockfd, false);
+        ssize_t ret = real_send(sockfd, buf, len, flags | MSG_DONTWAIT);
+        if (ret != -1 || errno != EAGAIN || timeout.count() == 0)
+        {
+            return ret;
+        }
+
+        simulator.waitUntil(simulator.now() + timeout);
+        return real_send(sockfd, buf, len, flags | MSG_DONTWAIT);
+    }
+
+    int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
+    {
+        static const auto real_connect = (decltype(&connect))dlsym(RTLD_NEXT, "connect");
+        auto &simulator = fakeclock::ClockSimulator::getInstance();
+        if (!simulator.isIntercepting())
+        {
+            return real_connect(sockfd, addr, addrlen);
+        }
+
+        auto timeout = get_timeout(sockfd, false);
+        if (timeout.count() == 0)
+        {
+            return real_connect(sockfd, addr, addrlen);
+        }
+
+        int orig_flags = fcntl(sockfd, F_GETFL, 0);
+        fcntl(sockfd, F_SETFL, orig_flags | O_NONBLOCK);
+        int ret = real_connect(sockfd, addr, addrlen);
+        if (ret == -1 && errno == EINPROGRESS)
+        {
+            simulator.waitUntil(simulator.now() + timeout);
+            ret = real_connect(sockfd, addr, addrlen);
+            if (ret == -1 && errno == EINPROGRESS)
+            {
+                errno = ETIMEDOUT;
+            }
+            else if (ret == -1 && errno == EISCONN)
+            {
+                ret = 0;
+            }
+        }
+        fcntl(sockfd, F_SETFL, orig_flags);
+        return ret;
+    }
+}
+
 // TODO:
 //  clock_settime
 //  clock_adjtime
@@ -379,4 +531,4 @@ extern "C"
 //  timer_settime64
 //  timerfd_gettime64
 //  timerfd_settime64
-//  socket operations with timeouts (e.g., connect, recv, send)
+//  socket operations with timeouts (implemented)

@@ -36,6 +36,7 @@ add_executable(test_fakeclock
     tests/test_gettime.cpp
     tests/test_clock_nanosleep.cpp
     tests/test_posix_timer.cpp
+    tests/test_socket_timeout.cpp
 )
 # Link the library and Google Test to the test executable
 target_link_libraries(test_fakeclock fakeclock GTest::gtest GTest::gtest_main pthread)
