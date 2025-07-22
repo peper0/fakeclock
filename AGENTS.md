@@ -29,6 +29,12 @@ Tips for faster setup
 - Reuse the same `build` directory when possible; CMake will only rebuild changed files.
 - Running tests directly after a successful build (`cmake --build . && ctest`) saves time.
 
+Updating these notes
+--------------------
+
+If a missing dependency or useful tool slows down your workflow, document the fix
+here so future runs can skip troubleshooting.
+
 Working via GitHub Issues
 -------------------------
 
