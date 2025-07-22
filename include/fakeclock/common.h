@@ -26,4 +26,9 @@ inline std::chrono::nanoseconds to_duration(const timespec &ts)
     return std::chrono::seconds(ts.tv_sec) + std::chrono::nanoseconds(ts.tv_nsec);
 }
 
+inline std::chrono::nanoseconds to_duration(const timeval &tv)
+{
+    return std::chrono::seconds(tv.tv_sec) + std::chrono::microseconds(tv.tv_usec);
+}
+
 } // namespace fakeclock
