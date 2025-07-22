@@ -5,6 +5,7 @@
 #include <signal.h>
 #include <stdexcept>
 #include <string.h>
+#include <chrono>
 #include <unistd.h>
 
 // ScopedSigpipeIgnore class definition
@@ -106,6 +107,16 @@ void ClockSimulator::waitUntil(TimePoint tp)
     });
 }
 
+void ClockSimulator::setTime(TimePoint tp)
+{
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        fake_time_ = tp;
+        handleExpiringFds();
+    }
+    cv_.notify_all();
+}
+
 ClockSimulator::TimePoint ClockSimulator::now() const
 {
     return fake_time_;
@@ -171,6 +182,8 @@ void ClockSimulator::timerfdGetTime(int fd, itimerspec *curr_value)
 void ClockSimulator::intercept()
 {
     intercepting_ = true;
+    fake_time_ = TimePoint(std::chrono::duration_cast<Duration>(
+        std::chrono::system_clock::now().time_since_epoch()));
 }
 
 void ClockSimulator::restore()

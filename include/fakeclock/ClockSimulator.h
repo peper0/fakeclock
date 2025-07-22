@@ -177,6 +177,7 @@ class ClockSimulator
     void cleanupTimerfds();
     void advance(std::chrono::nanoseconds duration);
     void waitUntil(TimePoint tp);
+    void setTime(TimePoint tp);
     TimePoint now() const;
     bool isIntercepting() const;
     int timerfdCreate();

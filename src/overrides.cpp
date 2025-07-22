@@ -4,6 +4,7 @@
 #include <dlfcn.h>
 #include <fakeclock/ClockSimulator.h>
 #include <fakeclock/common.h>
+#include <chrono>
 #include <iostream>
 #include <mutex>
 #include <poll.h>
@@ -103,6 +104,79 @@ extern "C"
             ts->tv_sec = std::chrono::duration_cast<std::chrono::seconds>(duration).count();
             ts->tv_nsec = std::chrono::duration_cast<std::chrono::nanoseconds>(duration).count() % 1000000000;
             return 0;
+        }
+    }
+
+    int settimeofday(const struct timeval *tv, const struct timezone *tz)
+    {
+        static const auto real_settimeofday = (decltype(&settimeofday))dlsym(RTLD_NEXT, "settimeofday");
+        auto &simulator = fakeclock::ClockSimulator::getInstance();
+        if (!simulator.isIntercepting())
+        {
+            return real_settimeofday(tv, tz);
+        }
+        else
+        {
+            if (!tv)
+            {
+                errno = EFAULT;
+                return -1;
+            }
+            if (tv->tv_usec < 0 || tv->tv_usec >= 1000000)
+            {
+                errno = EINVAL;
+                return -1;
+            }
+
+            auto duration = std::chrono::seconds(tv->tv_sec) + std::chrono::microseconds(tv->tv_usec);
+            simulator.setTime(TimePoint(duration));
+            (void)tz;
+            return 0;
+        }
+    }
+
+    int clock_settime(clockid_t clk_id, const struct timespec *ts)
+    {
+        static const auto real_clock_settime = (decltype(&clock_settime))dlsym(RTLD_NEXT, "clock_settime");
+        auto &simulator = fakeclock::ClockSimulator::getInstance();
+        if (!simulator.isIntercepting())
+        {
+            return real_clock_settime(clk_id, ts);
+        }
+        else
+        {
+            if (clk_id != CLOCK_REALTIME)
+            {
+                errno = EINVAL;
+                return -1;
+            }
+            if (ts->tv_nsec < 0 || ts->tv_nsec >= 1000000000)
+            {
+                errno = EINVAL;
+                return -1;
+            }
+            auto duration = std::chrono::seconds(ts->tv_sec) + std::chrono::nanoseconds(ts->tv_nsec);
+            simulator.setTime(TimePoint(duration));
+            return 0;
+        }
+    }
+
+    time_t time(time_t *t)
+    {
+        static const auto real_time = (decltype(&time))dlsym(RTLD_NEXT, "time");
+        auto &simulator = fakeclock::ClockSimulator::getInstance();
+        if (!simulator.isIntercepting())
+        {
+            return real_time(t);
+        }
+        else
+        {
+            time_t result = std::chrono::duration_cast<std::chrono::seconds>(simulator.now().time_since_epoch()).count();
+            if (t)
+            {
+                *t = result;
+            }
+            return result;
         }
     }
 

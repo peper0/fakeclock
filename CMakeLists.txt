@@ -34,6 +34,7 @@ add_executable(test_fakeclock
     tests/test_timerfd.cpp
     tests/test_sleep.cpp
     tests/test_gettime.cpp
+    tests/test_settime.cpp
     tests/test_clock_nanosleep.cpp
     tests/test_posix_timer.cpp
 )
