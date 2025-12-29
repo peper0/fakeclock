@@ -19,19 +19,9 @@
 namespace fakeclock
 {
 
-MasterOfTime::MasterOfTime(ClockType type)
+MasterOfTime::MasterOfTime()
 {
-    if (type == ClockType::MONOTONIC)
-    {
-        auto now = std::chrono::system_clock::now();
-        auto duration = now.time_since_epoch();
-        ClockSimulator::getInstance().addClock();
-        ClockSimulator::getInstance().setTime(FakeClock::time_point(duration));
-    }
-    else
-    {
-        ClockSimulator::getInstance().addClock();
-    }
+    ClockSimulator::getInstance().addClock();
 }
 
 MasterOfTime::~MasterOfTime()

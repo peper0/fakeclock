@@ -18,18 +18,12 @@ class FakeClock
     static time_point now() noexcept;
 };
 
-enum class ClockType
-{
-    MONOTONIC,
-    NON_MONOTONIC
-};
 class MasterOfTime
 {
 
   public:
-    /// Master of time is monotonic when by creating it, you are not going back in time.
-    /// Non monotonic master of time will set current time to 1 second after epoch.
-    MasterOfTime(ClockType type = ClockType::NON_MONOTONIC);
+    /// Monotonicity of std::chrono::steady_clock is preserved. Other clocks are changed stepwise.
+    MasterOfTime();
     ~MasterOfTime();
     MasterOfTime(const MasterOfTime &) = delete;
     void advance(FakeClock::duration duration);

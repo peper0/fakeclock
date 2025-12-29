@@ -208,8 +208,27 @@ timespec ClockSimulator::toTimespec(ClockId clk_id, TimePoint tp) const
     return fakeclock::to_timespec(tp.time_since_epoch() + getOffset(clk_id));
 }
 
+void ClockSimulator::setOffsetsUsingCurrentTime()
+{
+    for (ClockId clk_id : {CLOCK_REALTIME, CLOCK_MONOTONIC, CLOCK_MONOTONIC_RAW, CLOCK_BOOTTIME, CLOCK_TAI})
+    {
+        timespec ts;
+        int ret = clock_gettime(clk_id, &ts);
+        if (ret != 0)
+        {
+            throw std::runtime_error("Failed to get current time for clock id " + std::to_string(clk_id));
+        }
+        auto time_before = to_duration(ts);
+        setOffset(clk_id, time_before - fake_time_.time_since_epoch());
+    }
+}
+
 void ClockSimulator::intercept()
 {
+    if (!intercepting_)
+    {
+        setOffsetsUsingCurrentTime();
+    }
     intercepting_ = true;
 }
 void ClockSimulator::restore()
