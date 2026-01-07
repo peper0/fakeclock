@@ -31,6 +31,7 @@ class MasterOfTime
     /// Non monotonic master of time will set current time to 1 second after epoch.
     MasterOfTime(ClockType type = ClockType::NON_MONOTONIC);
     ~MasterOfTime();
+    MasterOfTime(const MasterOfTime &) = delete;
     void advance(FakeClock::duration duration);
 };
 

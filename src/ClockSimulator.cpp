@@ -1,12 +1,11 @@
 #include <cassert>
+#include <chrono>
 #include <fakeclock/ClockSimulator.h>
 #include <fakeclock/common.h>
 #include <iostream>
 #include <signal.h>
 #include <stdexcept>
-#include <string.h>
-#include <chrono>
-#include <unistd.h>
+#include <sys/timerfd.h>
 
 // ScopedSigpipeIgnore class definition
 class ScopedSigpipeIgnore
@@ -107,11 +106,11 @@ void ClockSimulator::waitUntil(TimePoint tp)
     });
 }
 
-void ClockSimulator::setTime(TimePoint tp)
+void ClockSimulator::setTime(TimePoint tp, ClockId clk_id)
 {
     {
         std::lock_guard<std::mutex> lock(mutex_);
-        fake_time_ = tp;
+        setOffset(clk_id, tp - fake_time_);
         handleExpiringFds();
     }
     cv_.notify_all();
@@ -122,16 +121,28 @@ ClockSimulator::TimePoint ClockSimulator::now() const
     return fake_time_;
 }
 
+ClockSimulator::TimePoint ClockSimulator::getTime(ClockId clk_id) const
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    return fake_time_ + getOffset(clk_id);
+}
+
 bool ClockSimulator::isIntercepting() const
 {
     return intercepting_;
 }
 
-int ClockSimulator::timerfdCreate()
+int ClockSimulator::timerfdCreate(ClockId clock_id, int flags)
 {
     std::lock_guard<std::mutex> lock(mutex_);
     TimerFd timer_fd;
-    timer_fd.open();
+
+    bool success = timer_fd.open(clock_id, flags);
+    if (!success)
+    {
+        errno = EINVAL;
+        return -1;
+    }
     int client_fd = timer_fd.getClientFd();
 
     {
@@ -162,6 +173,12 @@ void ClockSimulator::timerfdSetTime(int fd, TimePoint tp, Duration interval)
     handleExpiringFds();
 }
 
+ClockSimulator::ClockId ClockSimulator::timerfdGetClockId(int fd)
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    return timerfds_.at(fd).get_clock_id();
+}
+
 void ClockSimulator::timerfdGetTime(int fd, itimerspec *curr_value)
 {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -179,16 +196,44 @@ void ClockSimulator::timerfdGetTime(int fd, itimerspec *curr_value)
     curr_value->it_interval = to_timespec(timerfd.get_interval());
 }
 
+ClockSimulator::TimePoint ClockSimulator::toFakeTime(ClockId clk_id, timespec ts) const
+{
+    std::scoped_lock lock(mutex_);
+    return TimePoint(to_duration(ts) - getOffset(clk_id));
+}
+
+timespec ClockSimulator::toTimespec(ClockId clk_id, TimePoint tp) const
+{
+    std::scoped_lock lock(mutex_);
+    return fakeclock::to_timespec(tp.time_since_epoch() + getOffset(clk_id));
+}
+
 void ClockSimulator::intercept()
 {
     intercepting_ = true;
-    fake_time_ = TimePoint(std::chrono::duration_cast<Duration>(
-        std::chrono::system_clock::now().time_since_epoch()));
 }
-
 void ClockSimulator::restore()
 {
     intercepting_ = false;
+}
+
+ClockSimulator::Duration ClockSimulator::getOffset(ClockId clk_id) const
+{
+    if (clk_id >= 0 && clk_id < MAX_CLK_ID)
+    {
+        return clock_offsets_[clk_id];
+    }
+    return Duration::zero();
+}
+
+void ClockSimulator::setOffset(ClockId clk_id, Duration offset)
+{
+    if (clk_id >= 0 && clk_id < MAX_CLK_ID)
+    {
+        clock_offsets_[clk_id] = offset;
+    }
+    // In a real application, you might want to handle the case where the clock id is not found,
+    // e.g., by adding it or logging an error. For now, we assume it's in the list.
 }
 
 } // namespace fakeclock

@@ -83,7 +83,8 @@ extern "C"
         }
         else
         {
-            auto duration = simulator.now().time_since_epoch();
+            // TODO: handle tz
+            auto duration = simulator.getTime(CLOCK_REALTIME).time_since_epoch();
             tv->tv_sec = std::chrono::duration_cast<std::chrono::seconds>(duration).count();
             tv->tv_usec = std::chrono::duration_cast<std::chrono::microseconds>(duration).count() % 1000000;
             return 0;
@@ -100,7 +101,7 @@ extern "C"
         }
         else
         {
-            auto duration = simulator.now().time_since_epoch();
+            auto duration = simulator.getTime(clk_id).time_since_epoch();
             ts->tv_sec = std::chrono::duration_cast<std::chrono::seconds>(duration).count();
             ts->tv_nsec = std::chrono::duration_cast<std::chrono::nanoseconds>(duration).count() % 1000000000;
             return 0;
@@ -129,7 +130,8 @@ extern "C"
             }
 
             auto duration = std::chrono::seconds(tv->tv_sec) + std::chrono::microseconds(tv->tv_usec);
-            simulator.setTime(TimePoint(duration));
+            // TODO: handle tz
+            simulator.setTime(TimePoint(duration), CLOCK_REALTIME);
             (void)tz;
             return 0;
         }
@@ -145,18 +147,13 @@ extern "C"
         }
         else
         {
-            if (clk_id != CLOCK_REALTIME)
-            {
-                errno = EINVAL;
-                return -1;
-            }
             if (ts->tv_nsec < 0 || ts->tv_nsec >= 1000000000)
             {
                 errno = EINVAL;
                 return -1;
             }
             auto duration = std::chrono::seconds(ts->tv_sec) + std::chrono::nanoseconds(ts->tv_nsec);
-            simulator.setTime(TimePoint(duration));
+            simulator.setTime(TimePoint(duration), clk_id);
             return 0;
         }
     }
@@ -172,7 +169,8 @@ extern "C"
         else
         {
             time_t result =
-                std::chrono::duration_cast<std::chrono::seconds>(simulator.now().time_since_epoch()).count();
+                std::chrono::duration_cast<std::chrono::seconds>(simulator.getTime(CLOCK_REALTIME).time_since_epoch())
+                    .count();
             if (t)
             {
                 *t = result;
@@ -192,7 +190,7 @@ extern "C"
         else
         {
             auto now = simulator.now();
-            int fd = simulator.timerfdCreate();
+            int fd = simulator.timerfdCreate(CLOCK_MONOTONIC, 0);
             simulator.timerfdSetTime(fd, now + std::chrono::milliseconds(timeout));
             struct pollfd fake_fd = {fd, POLLIN, 0};
             std::vector<struct pollfd> all_fds(fds, fds + nfds);
@@ -214,7 +212,7 @@ extern "C"
         else
         {
             auto now = simulator.now();
-            int fd = simulator.timerfdCreate();
+            int fd = simulator.timerfdCreate(CLOCK_MONOTONIC, 0);
             simulator.timerfdSetTime(fd, now + std::chrono::milliseconds(timeout));
             struct epoll_event fake_event;
             fake_event.events = EPOLLIN;
@@ -239,7 +237,7 @@ extern "C"
         {
             auto now = simulator.now();
             auto duration = std::chrono::seconds(timeout->tv_sec) + std::chrono::microseconds(timeout->tv_usec);
-            int fd = simulator.timerfdCreate();
+            int fd = simulator.timerfdCreate(CLOCK_MONOTONIC, 0);
             simulator.timerfdSetTime(fd, now + duration);
             fd_set fake_readfds = *readfds;
             FD_SET(fd, &fake_readfds);
@@ -271,20 +269,7 @@ extern "C"
         }
         else
         {
-            if (flags & TFD_TIMER_CANCEL_ON_SET)
-            {
-                std::cerr << "TFD_TIMER_CANCEL_ON_SET is not supported" << std::endl;
-                errno = EINVAL;
-                return -1;
-            }
-            if (flags & TFD_NONBLOCK)
-            {
-                std::cerr << "TFD_NONBLOCK is not supported" << std::endl;
-                errno = EINVAL;
-                return -1;
-            }
-
-            return simulator.timerfdCreate();
+            return simulator.timerfdCreate(clockid, flags);
         }
     }
 
@@ -318,7 +303,9 @@ extern "C"
 
                     if (flags & TFD_TIMER_ABSTIME)
                     {
-                        expiration_time = TimePoint(to_duration(new_value->it_value));
+                        auto clock_id = simulator.timerfdGetClockId(fd);
+                        expiration_time =
+                            simulator.toFakeTime(clock_id, {new_value->it_value.tv_sec, new_value->it_value.tv_nsec});
                     }
                     else
                     {
@@ -407,7 +394,7 @@ extern "C"
                 if (flags & TIMER_ABSTIME)
                 {
                     // For absolute time, calculate how much time to wait
-                    auto target_time = TimePoint(to_duration(*request));
+                    auto target_time = simulator.toFakeTime(clock_id, *request);
                     if (target_time <= now)
                     {
                         // Target time has already passed
@@ -420,7 +407,7 @@ extern "C"
                 {
                     // For relative time, simply wait for the specified duration
                     auto duration = to_duration(*request);
-                    simulator.waitUntil(now + duration);
+                    simulator.waitUntil(simulator.now() + duration);
                 }
 
                 // In simulated time, there's no real interruption, so we always succeed
