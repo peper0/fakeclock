@@ -7,12 +7,13 @@
 #include <chrono>
 #include <condition_variable>
 #include <fakeclock/fakeclock.h>
+#include <fcntl.h>
 #include <fstream>
 #include <iostream>
 #include <mutex>
 #include <queue>
 #include <sys/eventfd.h>
-#include <sys/syscall.h>
+#include <sys/timerfd.h>
 #include <unistd.h>
 #include <unordered_map>
 
@@ -26,8 +27,12 @@ inline bool are_fds_equivalent(int fd1, int fd2)
     long res = syscall(SYS_kcmp, getpid(), getpid(), KCMP_FILE, fd1, fd2);
     return res == 0;
 #else
-    // compare strings from /proc/self/fdinfo/<fd1> with /proc/self/fdinfo/<fd2>
+    if (fcntl(fd1, F_GETFD) == -1 || fcntl(fd2, F_GETFD) == -1)
+    {
+        return false; // one of the fds is closed, e.g. due to O_CLOEXEC
+    }
 
+    // compare strings from /proc/self/fdinfo/<fd1> with /proc/self/fdinfo/<fd2>
     std::ifstream fd1_info("/proc/self/fdinfo/" + std::to_string(fd1));
     std::ifstream fd2_info("/proc/self/fdinfo/" + std::to_string(fd2));
     if (!fd1_info.is_open() || !fd2_info.is_open())
@@ -80,8 +85,40 @@ class TimerFd
     bool open(int clock_id_, int flags)
     {
         assert(!*this); // already opened
-        client_fd = eventfd(0, 0);
+        int eventfd_flags = 0;
+        int dup_flags = 0;
+        if (flags & TFD_TIMER_CANCEL_ON_SET)
+        {
+            std::cerr << "TFD_TIMER_CANCEL_ON_SET is not supported" << std::endl;
+            errno = EINVAL;
+            return false;
+        }
+        if (flags & TFD_NONBLOCK)
+        {
+            std::cerr << "TFD_NONBLOCK is not supported" << std::endl;
+            errno = EINVAL;
+            return false;
+        }
+        if (flags & TFD_CLOEXEC)
+        {
+            eventfd_flags |= EFD_CLOEXEC;
+            dup_flags |= FD_CLOEXEC;
+            flags &= ~TFD_CLOEXEC;
+        }
+
+        if (flags)
+        {
+            std::cerr << "Unsupported flags passed to timerfd_create: " << flags << std::endl;
+            errno = EINVAL;
+            return false;
+        }
+
+        client_fd = eventfd(0, eventfd_flags);
         my_fd = dup(client_fd);
+        if (dup_flags)
+        {
+            fcntl(my_fd, F_SETFD, dup_flags);
+        }
         clock_id = clock_id_;
         return true;
     }
@@ -167,8 +204,8 @@ class TimerFd
     }
 
   private:
-    int client_fd = -1;
-    int my_fd = -1;
+    int client_fd = -1; ///< fd returned to the client (closed by client)
+    int my_fd = -1;     ///< dup(client_fd) used to check if client closed the fd (closed by us)
     TimePoint next_expiration_time = DISARM_TIME;
     Duration interval = Duration::zero();
     int clock_id = -1;

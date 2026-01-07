@@ -1,6 +1,8 @@
 #include "test_helpers.h"
 #include <boost/asio.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/process/v2/process.hpp>
+#include <boost/process/v2/stdio.hpp>
 #include <chrono>
 #include <ctime>
 #include <fakeclock/fakeclock.h>
@@ -139,4 +141,37 @@ TEST(FakeClockBoostTest, asio_steady_timer_wait_in_background)
     EXPECT_FALSE(timer_expired);
     assert_sleeps_for(clock, STEP_DURATION, [&] { io_context.run(); });
     EXPECT_TRUE(timer_expired);
+}
+
+TEST(FakeClockBoostTest, asio_steady_timer_works_after_fork)
+{
+    MasterOfTime clock; // Take control of time
+    boost::asio::io_context io_context;
+    constexpr auto NUM_ITERATIONS = 10;
+    for (int i = 0; i < NUM_ITERATIONS; i++)
+    {
+        SCOPED_TRACE("Iteration " + std::to_string(i));
+        if (1)
+        {
+            boost::asio::readable_pipe rp{io_context};
+
+            boost::process::v2::process p{
+                io_context, "/usr/bin/echo", {"siema"}, boost::process::v2::process_stdio{{}, rp, {}}};
+            p.wait();
+        }
+
+        boost::asio::steady_timer timer(io_context, 1s);
+        bool timer_expired = false;
+        timer.async_wait([&timer_expired](const boost::system::error_code &ec) {
+            ASSERT_FALSE(ec);
+            timer_expired = true;
+        });
+        io_context.poll();
+        io_context.reset();
+        ASSERT_FALSE(timer_expired);
+        clock.advance(1s);
+        io_context.run_one();
+        io_context.reset();
+        EXPECT_TRUE(timer_expired);
+    }
 }
