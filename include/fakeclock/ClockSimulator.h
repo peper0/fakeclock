@@ -1,17 +1,19 @@
 #ifndef FAKECLOCK_CLOCKSIMULATOR_H
 #define FAKECLOCK_CLOCKSIMULATOR_H
 
+#include <array>
 #include <atomic>
 #include <cassert>
 #include <chrono>
 #include <condition_variable>
 #include <fakeclock/fakeclock.h>
+#include <fcntl.h>
 #include <fstream>
 #include <iostream>
 #include <mutex>
 #include <queue>
 #include <sys/eventfd.h>
-#include <sys/syscall.h>
+#include <sys/timerfd.h>
 #include <unistd.h>
 #include <unordered_map>
 
@@ -25,8 +27,12 @@ inline bool are_fds_equivalent(int fd1, int fd2)
     long res = syscall(SYS_kcmp, getpid(), getpid(), KCMP_FILE, fd1, fd2);
     return res == 0;
 #else
-    // compare strings from /proc/self/fdinfo/<fd1> with /proc/self/fdinfo/<fd2>
+    if (fcntl(fd1, F_GETFD) == -1 || fcntl(fd2, F_GETFD) == -1)
+    {
+        return false; // one of the fds is closed, e.g. due to O_CLOEXEC
+    }
 
+    // compare strings from /proc/self/fdinfo/<fd1> with /proc/self/fdinfo/<fd2>
     std::ifstream fd1_info("/proc/self/fdinfo/" + std::to_string(fd1));
     std::ifstream fd2_info("/proc/self/fdinfo/" + std::to_string(fd2));
     if (!fd1_info.is_open() || !fd2_info.is_open())
@@ -74,12 +80,47 @@ class TimerFd
         std::swap(my_fd, other.my_fd);
         std::swap(next_expiration_time, other.next_expiration_time);
         std::swap(interval, other.interval);
+        std::swap(clock_id, other.clock_id);
     }
-    void open()
+    bool open(int clock_id_, int flags)
     {
         assert(!*this); // already opened
-        client_fd = eventfd(0, 0);
+        int eventfd_flags = 0;
+        int dup_flags = 0;
+        if (flags & TFD_TIMER_CANCEL_ON_SET)
+        {
+            std::cerr << "TFD_TIMER_CANCEL_ON_SET is not supported" << std::endl;
+            errno = EINVAL;
+            return false;
+        }
+        if (flags & TFD_NONBLOCK)
+        {
+            std::cerr << "TFD_NONBLOCK is not supported" << std::endl;
+            errno = EINVAL;
+            return false;
+        }
+        if (flags & TFD_CLOEXEC)
+        {
+            eventfd_flags |= EFD_CLOEXEC;
+            dup_flags |= FD_CLOEXEC;
+            flags &= ~TFD_CLOEXEC;
+        }
+
+        if (flags)
+        {
+            std::cerr << "Unsupported flags passed to timerfd_create: " << flags << std::endl;
+            errno = EINVAL;
+            return false;
+        }
+
+        client_fd = eventfd(0, eventfd_flags);
         my_fd = dup(client_fd);
+        if (dup_flags)
+        {
+            fcntl(my_fd, F_SETFD, dup_flags);
+        }
+        clock_id = clock_id_;
+        return true;
     }
     void close()
     {
@@ -92,11 +133,11 @@ class TimerFd
         my_fd = -1;
         client_fd = -1;
     }
-    void set_time(TimePoint next_expiration_time, Duration interval = Duration::zero())
+    void set_time(TimePoint next_expiration_time_, Duration interval_ = Duration::zero())
     {
         assert(isValid());
-        this->next_expiration_time = next_expiration_time;
-        this->interval = interval;
+        this->next_expiration_time = next_expiration_time_;
+        this->interval = interval_;
     }
     TimePoint get_expiration_time() const
     {
@@ -107,6 +148,11 @@ class TimerFd
     {
         assert(isValid());
         return interval;
+    }
+    int get_clock_id() const
+    {
+        assert(isValid());
+        return clock_id;
     }
     void advance_to(TimePoint t)
     {
@@ -158,15 +204,19 @@ class TimerFd
     }
 
   private:
-    int client_fd = -1;
-    int my_fd = -1;
+    int client_fd = -1; ///< fd returned to the client (closed by client)
+    int my_fd = -1;     ///< dup(client_fd) used to check if client closed the fd (closed by us)
     TimePoint next_expiration_time = DISARM_TIME;
     Duration interval = Duration::zero();
+    int clock_id = -1;
 };
+
+constexpr int MAX_CLK_ID = 16;
 
 class ClockSimulator
 {
   public:
+    using ClockId = int32_t; // corresponds to clockid_t
     using TimePoint = FakeClock::time_point;
     using Duration = FakeClock::duration;
     static ClockSimulator &getInstance();
@@ -177,25 +227,33 @@ class ClockSimulator
     void cleanupTimerfds();
     void advance(std::chrono::nanoseconds duration);
     void waitUntil(TimePoint tp);
-    void setTime(TimePoint tp);
+    void setTime(TimePoint tp, ClockId clk_id);
     TimePoint now() const;
+    TimePoint getTime(ClockId clk_id) const;
     bool isIntercepting() const;
-    int timerfdCreate();
+    int timerfdCreate(ClockId clock_id, int flags);
     void timerfdSetTime(int fd, TimePoint tp, Duration interval = Duration::zero());
     void timerfdGetTime(int fd, struct itimerspec *curr_value);
+    ClockId timerfdGetClockId(int fd);
+    TimePoint toFakeTime(ClockId clk_id, timespec ts) const;
+    timespec toTimespec(ClockId clk_id, TimePoint tp) const;
 
   private:
     ClockSimulator() = default;
     void intercept();
     void restore();
     TimerFd &getTimerfd(int fd);
+    void setOffsetsUsingCurrentTime();
+    Duration getOffset(ClockId clk_id) const;
+    void setOffset(ClockId clk_id, Duration offset);
 
     TimePoint fake_time_ /* zero is used as "no value" */ = TimePoint(std::chrono::seconds{1});
     std::atomic<int> clock_count_ = 0;
-    std::mutex mutex_;
+    mutable std::mutex mutex_;
     std::condition_variable cv_;
     bool intercepting_ = false;
     std::unordered_map<int, TimerFd> timerfds_;
+    std::array<Duration, MAX_CLK_ID> clock_offsets_ = {}; // clock_time - fake_time
 };
 
 } // namespace fakeclock

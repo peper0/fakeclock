@@ -25,6 +25,8 @@ TEST(FakeClockSetTimeTest, ClockSettimeRealtime)
     fakeclock::MasterOfTime clock; // Take control of time
     struct timespec ts;
     ASSERT_EQ(clock_gettime(CLOCK_REALTIME, &ts), 0);
+    struct timespec ts_monotonic;
+    ASSERT_EQ(clock_gettime(CLOCK_MONOTONIC, &ts_monotonic), 0);
     struct timespec new_ts = ts;
     new_ts.tv_sec += 7;
     ASSERT_EQ(clock_settime(CLOCK_REALTIME, &new_ts), 0);
@@ -32,6 +34,11 @@ TEST(FakeClockSetTimeTest, ClockSettimeRealtime)
     ASSERT_EQ(clock_gettime(CLOCK_REALTIME, &ts_after), 0);
     EXPECT_EQ(ts_after.tv_sec, new_ts.tv_sec);
     EXPECT_EQ(ts_after.tv_nsec, new_ts.tv_nsec);
+    // Ensure that MONOTONIC time is unaffected
+    struct timespec ts_monotonic_after;
+    ASSERT_EQ(clock_gettime(CLOCK_MONOTONIC, &ts_monotonic_after), 0);
+    EXPECT_EQ(ts_monotonic_after.tv_sec, ts_monotonic.tv_sec);
+    EXPECT_EQ(ts_monotonic_after.tv_nsec, ts_monotonic.tv_nsec);
 }
 
 TEST(FakeClockSetTimeTest, TimeFunction)

@@ -32,7 +32,7 @@ TEST(ClockSimulatorTest, waitUntil)
 TEST(ClockSimulatorTest, timerfd)
 {
     fakeclock::MasterOfTime clock; // Take control of time
-    int fd = fakeclock::ClockSimulator::getInstance().timerfdCreate();
+    int fd = fakeclock::ClockSimulator::getInstance().timerfdCreate(CLOCK_MONOTONIC, 0);
     fakeclock::ClockSimulator::getInstance().timerfdSetTime(fd, fakeclock::ClockSimulator::getInstance().now() +
                                                                     LONG_DURATION);
     assert_sleeps_for(clock, LONG_DURATION, [fd] {
