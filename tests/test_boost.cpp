@@ -1,8 +1,11 @@
 #include "test_helpers.h"
 #include <boost/asio.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
+#if __has_include(<boost/process/v2/process.hpp>) && __has_include(<boost/process/v2/stdio.hpp>)
 #include <boost/process/v2/process.hpp>
 #include <boost/process/v2/stdio.hpp>
+#define FAKECLOCK_HAS_BOOST_PROCESS_V2
+#endif
 #include <chrono>
 #include <ctime>
 #include <fakeclock/fakeclock.h>
@@ -145,6 +148,9 @@ TEST(FakeClockBoostTest, asio_steady_timer_wait_in_background)
 
 TEST(FakeClockBoostTest, asio_steady_timer_works_after_fork)
 {
+#ifndef FAKECLOCK_HAS_BOOST_PROCESS_V2
+    GTEST_SKIP() << "Boost.Process v2 is not available in this Boost installation";
+#else
     MasterOfTime clock; // Take control of time
     boost::asio::io_context io_context;
     constexpr auto NUM_ITERATIONS = 10;
@@ -174,4 +180,5 @@ TEST(FakeClockBoostTest, asio_steady_timer_works_after_fork)
         io_context.reset();
         EXPECT_TRUE(timer_expired);
     }
+#endif
 }

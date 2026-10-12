@@ -28,6 +28,12 @@ Tips for faster setup
 - Install all dependencies in one step to avoid repeated apt calls.
 - Reuse the same `build` directory when possible; CMake will only rebuild changed files.
 - Running tests directly after a successful build (`cmake --build . && ctest`) saves time.
+- Boost.Process v2 is optional: Ubuntu 24.04's Boost 1.83 does not provide it.
+  CMake still builds the suite and the fork integration test reports a skip.
+  Do not disable the other Boost tests to accommodate an older installation.
+- Use `-DUSE_ASAN=ON -DCMAKE_BUILD_TYPE=Debug` for sanitizer regressions.
+  The `ClockRuntime.*` CTest cases run in separate processes with real-time
+  timeouts, including initialization before `main`.
 
 Updating these notes
 --------------------
@@ -49,4 +55,4 @@ scripts/github_activity.py
     - Answer each comment on github. It may be simple "fixed" or "done". If you
       disagree with the comment, explain why. If you don't understand the comment, ask for clarification.
     - If you need to make changes, do so in the same branch as the PR.
-    - After committing changes, check for new comments on the PR (and again after successive commits).  
+    - After committing changes, check for new comments on the PR (and again after successive commits).
