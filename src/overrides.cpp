@@ -12,6 +12,7 @@
 #include <stdexcept>
 #include <sys/epoll.h>
 #include <sys/eventfd.h>
+#include <sys/syscall.h>
 #include <sys/timerfd.h>
 #include <time.h>
 #include <unistd.h>
@@ -93,19 +94,13 @@ extern "C"
 
     int clock_gettime(clockid_t clk_id, struct timespec *ts) noexcept
     {
-        static const auto real_clock_gettime = (decltype(&clock_gettime))dlsym(RTLD_NEXT, "clock_gettime");
-        auto &simulator = fakeclock::ClockSimulator::getInstance();
-        if (!simulator.isIntercepting())
+        if (fakeclock::ClockSimulator::tryGetTime(clk_id, *ts))
         {
-            return real_clock_gettime(clk_id, ts);
-        }
-        else
-        {
-            auto duration = simulator.getTime(clk_id).time_since_epoch();
-            ts->tv_sec = std::chrono::duration_cast<std::chrono::seconds>(duration).count();
-            ts->tv_nsec = std::chrono::duration_cast<std::chrono::nanoseconds>(duration).count() % 1000000000;
             return 0;
         }
+        // dlsym may allocate and ASan's allocator itself calls clock_gettime.
+        // The inactive path must also work before any dynamic initialization.
+        return static_cast<int>(syscall(SYS_clock_gettime, clk_id, ts));
     }
 
     int settimeofday(const struct timeval *tv, const struct timezone *tz)

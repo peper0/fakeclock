@@ -231,6 +231,8 @@ class ClockSimulator
     TimePoint now() const;
     TimePoint getTime(ClockId clk_id) const;
     bool isIntercepting() const;
+    // Safe even before the singleton is constructed, or from inside an allocator.
+    static bool tryGetTime(ClockId clk_id, timespec &result) noexcept;
     int timerfdCreate(ClockId clock_id, int flags);
     void timerfdSetTime(int fd, TimePoint tp, Duration interval = Duration::zero());
     void timerfdGetTime(int fd, struct itimerspec *curr_value);
@@ -244,6 +246,7 @@ class ClockSimulator
     void restore();
     TimerFd &getTimerfd(int fd);
     void setOffsetsUsingCurrentTime();
+    void publishTime(); // Called with mutex_ held, before operations that may allocate.
     Duration getOffset(ClockId clk_id) const;
     void setOffset(ClockId clk_id, Duration offset);
 
@@ -251,7 +254,6 @@ class ClockSimulator
     std::atomic<int> clock_count_ = 0;
     mutable std::mutex mutex_;
     std::condition_variable cv_;
-    bool intercepting_ = false;
     std::unordered_map<int, TimerFd> timerfds_;
     std::array<Duration, MAX_CLK_ID> clock_offsets_ = {}; // clock_time - fake_time
 };
