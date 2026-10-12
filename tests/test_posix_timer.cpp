@@ -11,6 +11,20 @@
 #include <thread>
 using namespace std::chrono_literals;
 
+TEST(PosixTimerTest, RealTimerOutsideSimulation)
+{
+    // Versioned aliases must still forward to libc when no MasterOfTime exists.
+    sigevent notification{};
+    notification.sigev_notify = SIGEV_NONE;
+    timer_t timer{};
+    ASSERT_EQ(timer_create(CLOCK_MONOTONIC, &notification, &timer), 0);
+    itimerspec remaining{};
+    EXPECT_EQ(timer_gettime(timer, &remaining), 0);
+    EXPECT_EQ(remaining.it_value.tv_sec, 0);
+    EXPECT_EQ(remaining.it_value.tv_nsec, 0);
+    EXPECT_EQ(timer_delete(timer), 0);
+}
+
 TEST(PosixTimerTest, TimerCreateBasic)
 {
     fakeclock::MasterOfTime clock; // Take control of time

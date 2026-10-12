@@ -29,10 +29,14 @@ add_library(fakeclock SHARED
 
 target_include_directories(fakeclock PUBLIC include)
 
+# ASan uses dlvsym for POSIX timers. Keep their compatibility aliases visible.
+target_link_options(fakeclock PRIVATE "LINKER:--version-script=${CMAKE_CURRENT_SOURCE_DIR}/src/glibc_versions.map")
+set_property(TARGET fakeclock APPEND PROPERTY LINK_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/glibc_versions.map")
+
 # Find GTest package
 find_package(GTest REQUIRED)
 
-# Boost.Process v2 is optional (e.g. Ubuntu 24.04 ships Boost 1.83).
+# Older Boost releases provide Process headers without a separate CMake component.
 find_package(Boost REQUIRED OPTIONAL_COMPONENTS process)
 
 # Add executable for tests

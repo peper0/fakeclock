@@ -1,0 +1,4 @@
+# POSIX timer aliases used by ASan and by x86-64 / AArch64 glibc callers.
+GLIBC_2.3.3 { local: fakeclock_timer_*; };
+GLIBC_2.17 {} GLIBC_2.3.3;
+GLIBC_2.34 {} GLIBC_2.17;

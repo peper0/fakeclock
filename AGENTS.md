@@ -28,9 +28,9 @@ Tips for faster setup
 - Install all dependencies in one step to avoid repeated apt calls.
 - Reuse the same `build` directory when possible; CMake will only rebuild changed files.
 - Running tests directly after a successful build (`cmake --build . && ctest`) saves time.
-- Boost.Process v2 is optional: Ubuntu 24.04's Boost 1.83 does not provide it.
-  CMake still builds the suite and the fork integration test reports a skip.
-  Do not disable the other Boost tests to accommodate an older installation.
+- Older Boost releases may provide Process headers without a separate CMake
+  component. Keep that component optional; the fork integration test checks
+  header availability and reports a skip only when v2 headers are missing.
 - Use `-DUSE_ASAN=ON -DCMAKE_BUILD_TYPE=Debug` for sanitizer regressions.
   The `ClockRuntime.*` CTest cases run in separate processes with real-time
   timeouts, including initialization before `main`.
