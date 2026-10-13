@@ -50,6 +50,42 @@ cd build
 ctest
 ```
 
+Run the sanitizer regression tests with:
+
+```bash
+cmake -S . -B build-asan -DCMAKE_BUILD_TYPE=Debug -DUSE_ASAN=ON
+cmake --build build-asan --parallel 2
+ASAN_OPTIONS=detect_leaks=1:halt_on_error=1:detect_stack_use_after_return=1 \
+    ctest --test-dir build-asan --output-on-failure
+```
+
+`ClockRuntime.*` runs startup, timer allocation, new-thread initialization,
+concurrent allocation/clock reads, and repeated descriptor checks in separate
+processes. CTest enforces a
+20-second timeout on each process so a regression cannot hang the test runner.
+These tests and the existing suite run in GitHub Actions with GCC and Clang,
+with ASan both enabled and disabled, on x86-64 and ARM64.
+
+When adding an intercepted libc function, resolve its real implementation in
+the function body using the private `src/real_function.h` helper:
+
+```cpp
+const auto real_sleep = fakeclock::detail::realFunction<&sleep>(__func__);
+```
+
+The helper infers the exact function pointer type and caches the lookup per
+function. There is no registry or table to update. Add the simulation behavior
+and its tests alongside the existing overrides. POSIX timer definitions also
+declare their glibc compatibility aliases next to the function, using
+`FAKECLOCK_TIMER_ABI`.
+
+`clock_gettime` is the bootstrap exception: it must never call this resolver,
+construct the simulator, allocate memory, or wait for a writer. ASan may call it
+from inside an allocation while the simulator's mutex is held. Its real-time
+path uses a syscall, and its simulated path reads constant-initialized,
+lock-free atomic values. A spinlock or a seqlock retry would also deadlock on
+reentry from a suspended writer.
+
 ## Reporting Issues
 
 If you find a bug or have a feature request:

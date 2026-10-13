@@ -34,6 +34,32 @@ class ScopedSigpipeIgnore
 namespace fakeclock
 {
 
+namespace
+{
+using Tick = FakeClock::rep;
+static_assert(std::atomic<Tick>::is_always_lock_free);
+static_assert(std::atomic<bool>::is_always_lock_free);
+
+struct PublishedTime
+{
+    std::atomic<Tick> ticks{1'000'000'000};
+};
+
+// ASan can read the clock while an allocation has suspended a writer holding
+// mutex_. Readers must not allocate, initialize a singleton, lock, or spin for
+// that writer (a seqlock would deadlock too). Each clock publishes one complete
+// value, including its offset. Separate clock reads may straddle an advance.
+// The final slot holds FakeClock time and the existing fallback for unknown IDs.
+constinit std::array<PublishedTime, MAX_CLK_ID + 1> published_times;
+constinit std::atomic<bool> intercepting{false};
+
+Tick publishedTicks(ClockSimulator::ClockId clk_id) noexcept
+{
+    const auto index = clk_id >= 0 && clk_id < MAX_CLK_ID ? clk_id : MAX_CLK_ID;
+    return published_times[index].ticks.load(std::memory_order_relaxed);
+}
+} // namespace
+
 ClockSimulator &ClockSimulator::getInstance()
 {
     static ClockSimulator instance;
@@ -88,6 +114,7 @@ void ClockSimulator::advance(std::chrono::nanoseconds duration)
     {
         std::lock_guard<std::mutex> lock(mutex_);
         fake_time_ += duration;
+        publishTime();
         handleExpiringFds();
     }
     cv_.notify_all();
@@ -111,6 +138,7 @@ void ClockSimulator::setTime(TimePoint tp, ClockId clk_id)
     {
         std::lock_guard<std::mutex> lock(mutex_);
         setOffset(clk_id, tp - fake_time_);
+        publishTime();
         handleExpiringFds();
     }
     cv_.notify_all();
@@ -118,18 +146,41 @@ void ClockSimulator::setTime(TimePoint tp, ClockId clk_id)
 
 ClockSimulator::TimePoint ClockSimulator::now() const
 {
-    return fake_time_;
+    return TimePoint(Duration(publishedTicks(MAX_CLK_ID)));
 }
 
 ClockSimulator::TimePoint ClockSimulator::getTime(ClockId clk_id) const
 {
-    std::lock_guard<std::mutex> lock(mutex_);
-    return fake_time_ + getOffset(clk_id);
+    return TimePoint(Duration(publishedTicks(clk_id)));
 }
 
 bool ClockSimulator::isIntercepting() const
 {
-    return intercepting_;
+    return intercepting.load(std::memory_order_acquire);
+}
+
+bool ClockSimulator::tryGetTime(ClockId clk_id, timespec &result) noexcept
+{
+    if (!intercepting.load(std::memory_order_acquire))
+    {
+        return false;
+    }
+    // Keep the allocator-facing path to primitive operations: no chrono
+    // temporaries whose stack instrumentation could re-enter ASan's allocator.
+    const Tick ticks = publishedTicks(clk_id);
+    result.tv_sec = ticks / 1'000'000'000;
+    result.tv_nsec = ticks % 1'000'000'000;
+    return true;
+}
+
+void ClockSimulator::publishTime()
+{
+    published_times[MAX_CLK_ID].ticks.store(fake_time_.time_since_epoch().count(), std::memory_order_relaxed);
+    for (ClockId clk_id = 0; clk_id < MAX_CLK_ID; ++clk_id)
+    {
+        const Tick ticks = (fake_time_.time_since_epoch() + clock_offsets_[clk_id]).count();
+        published_times[clk_id].ticks.store(ticks, std::memory_order_relaxed);
+    }
 }
 
 int ClockSimulator::timerfdCreate(ClockId clock_id, int flags)
@@ -225,15 +276,16 @@ void ClockSimulator::setOffsetsUsingCurrentTime()
 
 void ClockSimulator::intercept()
 {
-    if (!intercepting_)
+    if (!isIntercepting())
     {
         setOffsetsUsingCurrentTime();
+        publishTime();
     }
-    intercepting_ = true;
+    intercepting.store(true, std::memory_order_release);
 }
 void ClockSimulator::restore()
 {
-    intercepting_ = false;
+    intercepting.store(false, std::memory_order_release);
 }
 
 ClockSimulator::Duration ClockSimulator::getOffset(ClockId clk_id) const

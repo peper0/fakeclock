@@ -1,6 +1,6 @@
+#include "real_function.h"
 #include <atomic>
 #include <cstring>
-#include <dlfcn.h>
 #include <fakeclock/ClockSimulator.h>
 #include <fakeclock/common.h>
 #include <mutex>
@@ -26,11 +26,26 @@ struct PosixTimer {
 static std::mutex posix_timers_mutex;
 static std::unordered_map<timer_t, PosixTimer> posix_timers;
 
+// Recent ASan runtimes resolve these functions with dlvsym(GLIBC_2.3.3).
+// An unversioned override would be skipped in favor of libc. Export the current
+// ABI and the pointer-based timer_t compatibility versions (x86-64 / AArch64).
+// Keep the C++ name unchanged so calls and decltype still use the libc signature.
+#if defined(__GLIBC__)
+#define FAKECLOCK_TIMER_ABI(name)                                                                                        \
+    __typeof__(name) name __asm__("fakeclock_" #name);                                                                   \
+    asm(".symver fakeclock_" #name "," #name "@GLIBC_2.3.3");                                                           \
+    asm(".symver fakeclock_" #name "," #name "@GLIBC_2.17");                                                            \
+    asm(".symver fakeclock_" #name "," #name "@@GLIBC_2.34");
+#else
+#define FAKECLOCK_TIMER_ABI(name)
+#endif
+
 extern "C"
 {
-    int timer_create(clockid_t clockid, struct sigevent *sevp, timer_t *timerid)
+    FAKECLOCK_TIMER_ABI(timer_create)
+    int timer_create(clockid_t clockid, struct sigevent *sevp, timer_t *timerid) noexcept
     {
-        static const auto real_timer_create = (decltype(&timer_create))dlsym(RTLD_NEXT, "timer_create");
+        const auto real_timer_create = fakeclock::detail::realFunction<&timer_create>(__func__);
         auto &simulator = fakeclock::ClockSimulator::getInstance();
         if (!simulator.isIntercepting())
         {
@@ -75,9 +90,10 @@ extern "C"
         }
     }
 
-    int timer_delete(timer_t timerid)
+    FAKECLOCK_TIMER_ABI(timer_delete)
+    int timer_delete(timer_t timerid) noexcept
     {
-        static const auto real_timer_delete = (decltype(&timer_delete))dlsym(RTLD_NEXT, "timer_delete");
+        const auto real_timer_delete = fakeclock::detail::realFunction<&timer_delete>(__func__);
         auto &simulator = fakeclock::ClockSimulator::getInstance();
         if (!simulator.isIntercepting())
         {
@@ -97,9 +113,10 @@ extern "C"
         }
     }
 
-    int timer_settime(timer_t timerid, int flags, const struct itimerspec *new_value, struct itimerspec *old_value)
+    FAKECLOCK_TIMER_ABI(timer_settime)
+    int timer_settime(timer_t timerid, int flags, const struct itimerspec *new_value, struct itimerspec *old_value) noexcept
     {
-        static const auto real_timer_settime = (decltype(&timer_settime))dlsym(RTLD_NEXT, "timer_settime");
+        const auto real_timer_settime = fakeclock::detail::realFunction<&timer_settime>(__func__);
         auto &simulator = fakeclock::ClockSimulator::getInstance();
         if (!simulator.isIntercepting())
         {
@@ -194,9 +211,10 @@ extern "C"
         }
     }
 
-    int timer_gettime(timer_t timerid, struct itimerspec *curr_value)
+    FAKECLOCK_TIMER_ABI(timer_gettime)
+    int timer_gettime(timer_t timerid, struct itimerspec *curr_value) noexcept
     {
-        static const auto real_timer_gettime = (decltype(&timer_gettime))dlsym(RTLD_NEXT, "timer_gettime");
+        const auto real_timer_gettime = fakeclock::detail::realFunction<&timer_gettime>(__func__);
         auto &simulator = fakeclock::ClockSimulator::getInstance();
         if (!simulator.isIntercepting())
         {

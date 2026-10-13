@@ -39,9 +39,20 @@ inline bool are_fds_equivalent(int fd1, int fd2)
     {
         return false;
     }
-    std::string info1((std::istreambuf_iterator<char>(fd1_info)), std::istreambuf_iterator<char>());
-    std::string info2((std::istreambuf_iterator<char>(fd2_info)), std::istreambuf_iterator<char>());
-    return info1 == info2;
+    // Avoid a sanitizer-instrumented iterator call for every byte. With GCC
+    // ASan's fake stack on ARM64 that path can exhaust the runtime watchdog.
+    const auto read_info = [](std::ifstream &stream) {
+        std::string contents;
+        std::array<char, 4096> buffer;
+        while (stream.read(buffer.data(), buffer.size()) || stream.gcount() > 0)
+        {
+            contents.append(buffer.data(), static_cast<std::size_t>(stream.gcount()));
+        }
+        return contents;
+    };
+    const auto info1 = read_info(fd1_info);
+    const auto info2 = read_info(fd2_info);
+    return fd1_info.eof() && fd2_info.eof() && info1 == info2;
 #endif
 }
 
@@ -231,6 +242,8 @@ class ClockSimulator
     TimePoint now() const;
     TimePoint getTime(ClockId clk_id) const;
     bool isIntercepting() const;
+    // Safe even before the singleton is constructed, or from inside an allocator.
+    static bool tryGetTime(ClockId clk_id, timespec &result) noexcept;
     int timerfdCreate(ClockId clock_id, int flags);
     void timerfdSetTime(int fd, TimePoint tp, Duration interval = Duration::zero());
     void timerfdGetTime(int fd, struct itimerspec *curr_value);
@@ -244,6 +257,7 @@ class ClockSimulator
     void restore();
     TimerFd &getTimerfd(int fd);
     void setOffsetsUsingCurrentTime();
+    void publishTime(); // Called with mutex_ held, before operations that may allocate.
     Duration getOffset(ClockId clk_id) const;
     void setOffset(ClockId clk_id, Duration offset);
 
@@ -251,7 +265,6 @@ class ClockSimulator
     std::atomic<int> clock_count_ = 0;
     mutable std::mutex mutex_;
     std::condition_variable cv_;
-    bool intercepting_ = false;
     std::unordered_map<int, TimerFd> timerfds_;
     std::array<Duration, MAX_CLK_ID> clock_offsets_ = {}; // clock_time - fake_time
 };

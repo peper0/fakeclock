@@ -1,8 +1,8 @@
+#include "real_function.h"
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <cstring>
-#include <dlfcn.h>
 #include <fakeclock/ClockSimulator.h>
 #include <fakeclock/common.h>
 #include <iostream>
@@ -12,6 +12,7 @@
 #include <stdexcept>
 #include <sys/epoll.h>
 #include <sys/eventfd.h>
+#include <sys/syscall.h>
 #include <sys/timerfd.h>
 #include <time.h>
 #include <unistd.h>
@@ -26,7 +27,7 @@ extern "C"
 {
     unsigned int sleep(unsigned int seconds)
     {
-        static const auto real_sleep = (decltype(&sleep))dlsym(RTLD_NEXT, "sleep");
+        const auto real_sleep = fakeclock::detail::realFunction<&sleep>(__func__);
         auto &simulator = fakeclock::ClockSimulator::getInstance();
         if (!simulator.isIntercepting())
         {
@@ -42,7 +43,7 @@ extern "C"
 
     int usleep(useconds_t usec)
     {
-        static const auto real_usleep = (decltype(&usleep))dlsym(RTLD_NEXT, "usleep");
+        const auto real_usleep = fakeclock::detail::realFunction<&usleep>(__func__);
         auto &simulator = fakeclock::ClockSimulator::getInstance();
         if (!simulator.isIntercepting())
         {
@@ -58,7 +59,7 @@ extern "C"
 
     int nanosleep(const struct timespec *req, struct timespec *rem)
     {
-        static const auto real_nanosleep = (decltype(&nanosleep))dlsym(RTLD_NEXT, "nanosleep");
+        const auto real_nanosleep = fakeclock::detail::realFunction<&nanosleep>(__func__);
         auto &simulator = fakeclock::ClockSimulator::getInstance();
         if (!simulator.isIntercepting())
         {
@@ -75,7 +76,7 @@ extern "C"
 
     int gettimeofday(struct timeval *tv, void *tz)
     {
-        static const auto real_gettimeofday = (decltype(&gettimeofday))dlsym(RTLD_NEXT, "gettimeofday");
+        const auto real_gettimeofday = fakeclock::detail::realFunction<&gettimeofday>(__func__);
         auto &simulator = fakeclock::ClockSimulator::getInstance();
         if (!simulator.isIntercepting())
         {
@@ -93,24 +94,18 @@ extern "C"
 
     int clock_gettime(clockid_t clk_id, struct timespec *ts) noexcept
     {
-        static const auto real_clock_gettime = (decltype(&clock_gettime))dlsym(RTLD_NEXT, "clock_gettime");
-        auto &simulator = fakeclock::ClockSimulator::getInstance();
-        if (!simulator.isIntercepting())
+        if (fakeclock::ClockSimulator::tryGetTime(clk_id, *ts))
         {
-            return real_clock_gettime(clk_id, ts);
-        }
-        else
-        {
-            auto duration = simulator.getTime(clk_id).time_since_epoch();
-            ts->tv_sec = std::chrono::duration_cast<std::chrono::seconds>(duration).count();
-            ts->tv_nsec = std::chrono::duration_cast<std::chrono::nanoseconds>(duration).count() % 1000000000;
             return 0;
         }
+        // dlsym may allocate and ASan's allocator itself calls clock_gettime.
+        // The inactive path must also work before any dynamic initialization.
+        return static_cast<int>(syscall(SYS_clock_gettime, clk_id, ts));
     }
 
     int settimeofday(const struct timeval *tv, const struct timezone *tz)
     {
-        static const auto real_settimeofday = (decltype(&settimeofday))dlsym(RTLD_NEXT, "settimeofday");
+        const auto real_settimeofday = fakeclock::detail::realFunction<&settimeofday>(__func__);
         auto &simulator = fakeclock::ClockSimulator::getInstance();
         if (!simulator.isIntercepting())
         {
@@ -139,7 +134,7 @@ extern "C"
 
     int clock_settime(clockid_t clk_id, const struct timespec *ts)
     {
-        static const auto real_clock_settime = (decltype(&clock_settime))dlsym(RTLD_NEXT, "clock_settime");
+        const auto real_clock_settime = fakeclock::detail::realFunction<&clock_settime>(__func__);
         auto &simulator = fakeclock::ClockSimulator::getInstance();
         if (!simulator.isIntercepting())
         {
@@ -160,7 +155,7 @@ extern "C"
 
     time_t time(time_t *t)
     {
-        static const auto real_time = (decltype(&time))dlsym(RTLD_NEXT, "time");
+        const auto real_time = fakeclock::detail::realFunction<&time>(__func__);
         auto &simulator = fakeclock::ClockSimulator::getInstance();
         if (!simulator.isIntercepting())
         {
@@ -181,7 +176,7 @@ extern "C"
 
     int poll(struct pollfd *fds, nfds_t nfds, int timeout)
     {
-        static const auto real_poll = (decltype(&poll))dlsym(RTLD_NEXT, "poll");
+        const auto real_poll = fakeclock::detail::realFunction<&poll>(__func__);
         auto &simulator = fakeclock::ClockSimulator::getInstance();
         if (!simulator.isIntercepting() || timeout <= 0)
         {
@@ -203,7 +198,7 @@ extern "C"
 
     int epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout)
     {
-        static const auto real_epoll_wait = (decltype(&epoll_wait))dlsym(RTLD_NEXT, "epoll_wait");
+        const auto real_epoll_wait = fakeclock::detail::realFunction<&epoll_wait>(__func__);
         auto &simulator = fakeclock::ClockSimulator::getInstance();
         if (!simulator.isIntercepting() || timeout <= 0)
         {
@@ -227,7 +222,7 @@ extern "C"
 
     int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout)
     {
-        static const auto real_select = (decltype(&select))dlsym(RTLD_NEXT, "select");
+        const auto real_select = fakeclock::detail::realFunction<&select>(__func__);
         auto &simulator = fakeclock::ClockSimulator::getInstance();
         if (!simulator.isIntercepting() || !timeout)
         {
@@ -261,7 +256,7 @@ extern "C"
 
     int timerfd_create(int clockid, int flags)
     {
-        static const auto real_timerfd_create = (decltype(&timerfd_create))dlsym(RTLD_NEXT, "timerfd_create");
+        const auto real_timerfd_create = fakeclock::detail::realFunction<&timerfd_create>(__func__);
         auto &simulator = fakeclock::ClockSimulator::getInstance();
         if (!simulator.isIntercepting())
         {
@@ -275,7 +270,7 @@ extern "C"
 
     int timerfd_settime(int fd, int flags, const struct itimerspec *new_value, struct itimerspec *old_value)
     {
-        static const auto real_timerfd_settime = (decltype(&timerfd_settime))dlsym(RTLD_NEXT, "timerfd_settime");
+        const auto real_timerfd_settime = fakeclock::detail::realFunction<&timerfd_settime>(__func__);
         auto &simulator = fakeclock::ClockSimulator::getInstance();
         if (!simulator.isIntercepting())
         {
@@ -341,7 +336,7 @@ extern "C"
 
     int timerfd_gettime(int fd, struct itimerspec *curr_value)
     {
-        static const auto real_timerfd_gettime = (decltype(&timerfd_gettime))dlsym(RTLD_NEXT, "timerfd_gettime");
+        const auto real_timerfd_gettime = fakeclock::detail::realFunction<&timerfd_gettime>(__func__);
         auto &simulator = fakeclock::ClockSimulator::getInstance();
         if (!simulator.isIntercepting())
         {
@@ -369,7 +364,7 @@ extern "C"
 
     int clock_nanosleep(clockid_t clock_id, int flags, const struct timespec *request, struct timespec *remain)
     {
-        static const auto real_clock_nanosleep = (decltype(&clock_nanosleep))dlsym(RTLD_NEXT, "clock_nanosleep");
+        const auto real_clock_nanosleep = fakeclock::detail::realFunction<&clock_nanosleep>(__func__);
         auto &simulator = fakeclock::ClockSimulator::getInstance();
         if (!simulator.isIntercepting())
         {
