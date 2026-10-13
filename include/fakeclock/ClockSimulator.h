@@ -39,9 +39,20 @@ inline bool are_fds_equivalent(int fd1, int fd2)
     {
         return false;
     }
-    std::string info1((std::istreambuf_iterator<char>(fd1_info)), std::istreambuf_iterator<char>());
-    std::string info2((std::istreambuf_iterator<char>(fd2_info)), std::istreambuf_iterator<char>());
-    return info1 == info2;
+    // Avoid a sanitizer-instrumented iterator call for every byte. With GCC
+    // ASan's fake stack on ARM64 that path can exhaust the runtime watchdog.
+    const auto read_info = [](std::ifstream &stream) {
+        std::string contents;
+        std::array<char, 4096> buffer;
+        while (stream.read(buffer.data(), buffer.size()) || stream.gcount() > 0)
+        {
+            contents.append(buffer.data(), static_cast<std::size_t>(stream.gcount()));
+        }
+        return contents;
+    };
+    const auto info1 = read_info(fd1_info);
+    const auto info2 = read_info(fd2_info);
+    return fd1_info.eof() && fd2_info.eof() && info1 == info2;
 #endif
 }
 
