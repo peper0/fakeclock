@@ -38,6 +38,18 @@ jobs:
 
     - name: Run tests
       run: ctest --test-dir build --output-on-failure
+
+    - name: Capture sanitizer deadlock stacks
+      if: failure() && matrix.compiler == 'gcc' && matrix.asan == 'ON'
+      run: |
+        command -v gdb || sudo apt-get install -y gdb
+        for scenario in timers concurrent; do
+          timeout --signal=INT --kill-after=5s 10s gdb -q -batch \
+            -ex 'set pagination off' -ex 'set debuginfod enabled off' \
+            -ex 'set environment ASAN_OPTIONS=detect_leaks=0:halt_on_error=1:detect_stack_use_after_return=1' \
+            -ex run -ex 'thread apply all bt 40' \
+            --args ./build/test_clock_runtime "$scenario" || true
+        done
       
     - name: Run README example
       run: timeout 20s ./build/readme_example
