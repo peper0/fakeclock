@@ -43,7 +43,7 @@ jobs:
       if: failure() && matrix.compiler == 'gcc' && matrix.asan == 'ON'
       run: |
         command -v gdb || sudo apt-get install -y gdb
-        for scenario in timers concurrent; do
+        for scenario in timers concurrent fdinfo; do
           timeout --signal=INT --kill-after=5s 10s gdb -q -batch \
             -ex 'set pagination off' -ex 'set debuginfod enabled off' \
             -ex 'set environment ASAN_OPTIONS=detect_leaks=0:halt_on_error=1:detect_stack_use_after_return=1' \

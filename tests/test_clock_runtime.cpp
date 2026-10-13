@@ -1,3 +1,4 @@
+#include <fakeclock/ClockSimulator.h>
 #include <fakeclock/fakeclock.h>
 
 #include <array>
@@ -10,6 +11,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <sys/syscall.h>
+#include <sys/eventfd.h>
 #include <sys/time.h>
 #include <sys/timerfd.h>
 #include <thread>
@@ -104,6 +106,23 @@ void timers()
     require(std::chrono::steady_clock::now() - before == 1024ms, "published time must follow advancement");
 }
 
+void fdinfo()
+{
+    // Isolate descriptor checks from clock interception and simulator locking.
+    // GCC ASan on ARM64 must also complete repeated checks with UAR enabled.
+    const int fd = eventfd(0, EFD_CLOEXEC);
+    require(fd >= 0, "create descriptor for fdinfo checks");
+    const int duplicate = dup(fd);
+    require(duplicate >= 0, "duplicate descriptor for fdinfo checks");
+    for (int i = 0; i < 1024; ++i)
+    {
+        require(fakeclock::are_fds_equivalent(fd, duplicate), "duplicated descriptors must remain equivalent");
+    }
+    require(close(fd) == 0, "close fdinfo descriptor");
+    require(!fakeclock::are_fds_equivalent(fd, duplicate), "closed descriptors must not be equivalent");
+    require(close(duplicate) == 0, "close fdinfo duplicate");
+}
+
 void threads()
 {
     fakeclock::MasterOfTime clock;
@@ -167,6 +186,8 @@ int main(int argc, char **argv)
         startup();
     else if (std::strcmp(argv[1], "timers") == 0)
         timers();
+    else if (std::strcmp(argv[1], "fdinfo") == 0)
+        fdinfo();
     else if (std::strcmp(argv[1], "threads") == 0)
         threads();
     else if (std::strcmp(argv[1], "concurrent") == 0)

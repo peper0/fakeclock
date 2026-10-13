@@ -68,7 +68,7 @@ set_tests_properties(FakeClockTest PROPERTIES TIMEOUT 60)
 # CTest owns the timeout; an intercepted clock cannot stop the watchdog.
 add_executable(test_clock_runtime tests/test_clock_runtime.cpp)
 target_link_libraries(test_clock_runtime PRIVATE fakeclock pthread)
-foreach(scenario startup timers threads concurrent)
+foreach(scenario startup timers threads concurrent fdinfo)
     add_test(NAME ClockRuntime.${scenario} COMMAND test_clock_runtime ${scenario})
     set_tests_properties(ClockRuntime.${scenario} PROPERTIES TIMEOUT 20)
 endforeach()
