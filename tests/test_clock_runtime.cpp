@@ -110,7 +110,7 @@ void fdinfo()
 {
     // Isolate descriptor checks from clock interception and simulator locking.
     // GCC ASan on ARM64 must also complete repeated checks with UAR enabled.
-    const int fd = eventfd(0, EFD_CLOEXEC);
+    const int fd = eventfd(0, 0);
     require(fd >= 0, "create descriptor for fdinfo checks");
     const int duplicate = dup(fd);
     require(duplicate >= 0, "duplicate descriptor for fdinfo checks");
